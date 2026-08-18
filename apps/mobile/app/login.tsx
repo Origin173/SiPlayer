@@ -10,7 +10,7 @@ import { useTheme } from '@/theme';
 export default function LoginScreen() {
   const { theme } = useTheme();
   const router = useRouter();
-  const { isAuthenticated, pollQr, startQr, user } = useAuth();
+  const { isAuthenticated, isHydrating, pollQr, startQr, user } = useAuth();
   const [qr, setQr] = useState<QrStartData | null>(null);
   const [status, setStatus] = useState<QrStatusData['status'] | 'ERROR'>('WAITING_SCAN');
   const [error, setError] = useState(false);
@@ -33,8 +33,8 @@ export default function LoginScreen() {
   }, [startQr]);
 
   useEffect(() => {
-    if (!isAuthenticated) void loadQr();
-  }, [isAuthenticated, loadQr]);
+    if (!isHydrating && !isAuthenticated) void loadQr();
+  }, [isAuthenticated, isHydrating, loadQr]);
 
   useEffect(() => {
     if (!qr || (status !== 'WAITING_SCAN' && status !== 'WAITING_CONFIRM')) return;
