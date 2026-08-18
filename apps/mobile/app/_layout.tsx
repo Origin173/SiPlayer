@@ -38,6 +38,7 @@ function RootNavigator() {
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.colors.background } }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="now-playing" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="lyrics" options={{ presentation: 'modal' }} />
         <Stack.Screen name="playlist/[id]" />
         <Stack.Screen name="login" />
         <Stack.Screen name="settings" />

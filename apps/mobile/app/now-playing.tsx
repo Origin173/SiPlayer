@@ -32,8 +32,6 @@ export default function NowPlayingScreen() {
     );
   }
 
-  const currentTrack = mockTracks.find((track) => track.id === current.trackId);
-
   return (
     <Screen contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -81,7 +79,7 @@ export default function NowPlayingScreen() {
       <View style={styles.secondaryControls}>
         <IconButton accessibilityLabel="切换播放模式" name="repeat-outline" onPress={() => player.setMode('repeat_all')} />
         <IconButton accessibilityLabel="喜欢这首歌" name="heart-outline" onPress={() => undefined} />
-        <IconButton accessibilityLabel="查看歌词" name="text-outline" onPress={() => undefined} />
+        <IconButton accessibilityLabel="查看歌词" name="text-outline" onPress={() => router.push('/lyrics')} />
         <IconButton accessibilityLabel="打开播放队列" name="list-outline" onPress={() => undefined} />
       </View>
 
@@ -95,7 +93,7 @@ export default function NowPlayingScreen() {
           return track ? <SongRow key={`${item.trackId}-${index}`} isCurrent={index === currentIndex} onPress={() => player.setQueue(queue, index)} track={track} /> : null;
         })}
       </ScrollView>
-      {currentTrack ? <Text style={[styles.sourceNote, { color: theme.colors.textTertiary }]}>当前为本地演示播放状态</Text> : null}
+      <Text style={[styles.sourceNote, { color: theme.colors.textTertiary }]}>播放地址由 Gateway 临时解析，不会写入队列</Text>
     </Screen>
   );
 }
