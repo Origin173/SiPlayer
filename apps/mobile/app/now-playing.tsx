@@ -1,6 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/auth';
+import { useTrackLike } from '@/api/hooks';
 import { Artwork, SongRow } from '@/components/music';
 import { EmptyState, IconButton, Screen } from '@/components/ui';
 import { mockTracks } from '@/features/mockData';
@@ -12,6 +15,8 @@ export default function NowPlayingScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const player = usePlayer();
+  const auth = useAuth();
+  const likeMutation = useTrackLike();
   const { width } = useWindowDimensions();
   const queue = usePlayerStore((state) => state.queue);
   const currentIndex = usePlayerStore((state) => state.currentIndex);
@@ -19,6 +24,8 @@ export default function NowPlayingScreen() {
   const positionMs = usePlayerStore((state) => state.positionMs);
   const durationMs = usePlayerStore((state) => state.durationMs);
   const current = queue[currentIndex];
+  const [liked, setLiked] = useState(current?.track?.liked ?? false);
+  useEffect(() => setLiked(current?.track?.liked ?? false), [current?.track?.liked, current?.trackId]);
   const artworkSize = Math.min(Math.max(width - 64, 240), 360);
   const isPlaying = playbackState === 'playing';
   const progress = durationMs > 0 ? Math.min(positionMs / durationMs, 1) : 0;
@@ -78,7 +85,21 @@ export default function NowPlayingScreen() {
 
       <View style={styles.secondaryControls}>
         <IconButton accessibilityLabel="切换播放模式" name="repeat-outline" onPress={() => player.setMode('repeat_all')} />
-        <IconButton accessibilityLabel="喜欢这首歌" name="heart-outline" onPress={() => undefined} />
+        <IconButton
+          accessibilityLabel={liked ? '取消喜欢' : '喜欢这首歌'}
+          color={liked ? theme.colors.primary : undefined}
+          disabled={likeMutation.isPending}
+          name={liked ? 'heart' : 'heart-outline'}
+          onPress={() => {
+            if (!auth.isAuthenticated) {
+              router.push('/login');
+              return;
+            }
+            const nextLiked = !liked;
+            setLiked(nextLiked);
+            likeMutation.mutate({ liked: nextLiked, trackId: current.trackId }, { onError: () => setLiked(liked) });
+          }}
+        />
         <IconButton accessibilityLabel="查看歌词" name="text-outline" onPress={() => router.push('/lyrics')} />
         <IconButton accessibilityLabel="打开播放队列" name="list-outline" onPress={() => undefined} />
       </View>
