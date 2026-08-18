@@ -6,9 +6,12 @@ import {
 } from '@siplayer/contracts';
 import { randomUUID } from 'node:crypto';
 import { loadConfig, type GatewayConfig } from './config/env';
+import { NeteaseProvider, type ContentProvider } from './providers';
+import { registerContentRoutes } from './routes/content';
 
 export interface BuildAppOptions {
   logger?: FastifyServerOptions['logger'];
+  provider?: ContentProvider;
 }
 
 function requestId(value: string | number): string {
@@ -65,6 +68,10 @@ export function buildApp(
   app.get('/health', healthHandler);
   app.get('/v1/ready', readyHandler);
   app.get('/ready', readyHandler);
+
+  registerContentRoutes(app, {
+    provider: options.provider ?? new NeteaseProvider({ baseUrl: config.NETEASE_API_BASE_URL }),
+  });
 
   app.setNotFoundHandler(async (request, reply) => {
     const response: ErrorEnvelope = {

@@ -1,0 +1,23 @@
+{
+  "code": 200,
+  "result": {
+    "songCount": 1,
+    "more": false,
+    "songs": [
+      {
+        "id": 123456,
+        "name": "Quiet Morning",
+        "ar": [{ "id": 42, "name": "Origin", "picUrl": "https://example.com/artist.png" }],
+        "al": {
+          "id": 99,
+          "name": "Soft Signals",
+          "picUrl": "https://example.com/album.png",
+          "publishTime": 1704067200000,
+          "artists": [{ "id": 42, "name": "Origin" }]
+        },
+        "dt": 214000,
+        "fee": 0
+      }
+    ]
+  }
+}
