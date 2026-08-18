@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import {
   QrStartDataSchema,
   QrStatusDataSchema,
@@ -23,6 +24,7 @@ export interface AuthController {
 const AuthContext = createContext<AuthController | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
 
@@ -38,12 +40,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } catch (error) {
       if (error instanceof ApiError && (error.code === 'AUTH_EXPIRED' || error.code === 'AUTH_REQUIRED')) {
         await clearSessionToken();
+        queryClient.removeQueries({ queryKey: ['me'] });
         setUser(null);
         return;
       }
       throw error;
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     void refresh()
@@ -72,9 +75,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       // A revoked or expired server session is already logged out.
     } finally {
       await clearSessionToken();
+      queryClient.removeQueries({ queryKey: ['me'] });
       setUser(null);
     }
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo<AuthController>(
     () => ({ user, isHydrating, isAuthenticated: Boolean(user), refresh, startQr, pollQr, logout }),
