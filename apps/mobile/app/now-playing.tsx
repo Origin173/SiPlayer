@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/auth';
 import { useTrackLike } from '@/api/hooks';
@@ -26,6 +26,7 @@ export default function NowPlayingScreen() {
   const durationMs = usePlayerStore((state) => state.durationMs);
   const current = queue[currentIndex];
   const [liked, setLiked] = useState(current?.track?.liked ?? false);
+  const [queueOpen, setQueueOpen] = useState(false);
   useEffect(() => setLiked(current?.track?.liked ?? false), [current?.track?.liked, current?.trackId]);
   const artworkSize = Math.min(Math.max(width - 64, 240), 360);
   const isPlaying = playbackState === 'playing';
@@ -109,6 +110,7 @@ export default function NowPlayingScreen() {
           }}
         />
         <IconButton accessibilityLabel="查看歌词" name="text-outline" onPress={() => router.push('/lyrics')} />
+        <IconButton accessibilityLabel="打开播放队列" name="list-outline" onPress={() => setQueueOpen(true)} />
       </View>
 
       <View style={[styles.queueHeader, { borderTopColor: theme.colors.divider }]}>
@@ -130,6 +132,30 @@ export default function NowPlayingScreen() {
         ))}
       </ScrollView>
       <Text style={[styles.sourceNote, { color: theme.colors.textTertiary }]}>播放地址由 Gateway 临时解析，不会写入队列</Text>
+
+      <Modal animationType="slide" onRequestClose={() => setQueueOpen(false)} transparent visible={queueOpen}>
+        <View style={styles.modalRoot}>
+          <Pressable accessibilityLabel="关闭播放队列" onPress={() => setQueueOpen(false)} style={styles.modalBackdrop} />
+          <View style={[styles.sheet, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.dragIndicator} />
+            <View style={styles.sheetHeader}>
+              <Text style={[styles.queueTitle, { color: theme.colors.textPrimary }]}>播放队列</Text>
+              <IconButton accessibilityLabel="关闭播放队列" name="close" onPress={() => setQueueOpen(false)} />
+            </View>
+            <ScrollView>
+              {queue.map((item, index) => (
+                <SongRow
+                  key={`sheet-${item.trackId}-${index}`}
+                  isCurrent={index === currentIndex}
+                  onPress={() => { setQueueOpen(false); player.setQueue(queue, index); }}
+                  onRemove={index === currentIndex ? undefined : () => player.removeFromQueue(index)}
+                  track={trackFromQueueItem(item)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
@@ -157,4 +183,9 @@ const styles = StyleSheet.create({
   queueActions: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   clearNext: { fontSize: 12, fontWeight: '600' },
   sourceNote: { fontSize: 11, marginTop: 16, textAlign: 'center' },
+  modalRoot: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { backgroundColor: 'rgba(0, 0, 0, 0.35)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%', paddingBottom: 24, paddingHorizontal: 16, paddingTop: 10 },
+  dragIndicator: { alignSelf: 'center', backgroundColor: '#A5A5A5', borderRadius: 999, height: 4, marginBottom: 8, width: 36 },
+  sheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
 });
