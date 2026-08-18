@@ -60,7 +60,15 @@ export class SessionStore {
     this.ttlMs = ttlMs;
   }
 
+  private pruneExpired(): void {
+    const now = Date.now();
+    for (const [tokenHash, session] of this.sessions) {
+      if (session.expiresAtMs <= now) this.sessions.delete(tokenHash);
+    }
+  }
+
   create(user: UserProfile, cookie: string): { token: string; expiresAt: string } {
+    this.pruneExpired();
     const token = randomBytes(32).toString('base64url');
     const expiresAtMs = Date.now() + this.ttlMs;
     this.sessions.set(hashToken(token), {
@@ -72,6 +80,7 @@ export class SessionStore {
   }
 
   get(token: string): SessionPrincipal | null {
+    this.pruneExpired();
     const tokenHash = hashToken(token);
     const stored = this.sessions.get(tokenHash);
     if (!stored) return null;

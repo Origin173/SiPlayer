@@ -43,6 +43,27 @@ export function buildApp(
     genReqId: () => `req_${randomUUID()}`,
   });
 
+  const rateBuckets = new Map<string, { startedAt: number; count: number }>();
+  app.addHook('onRequest', async (request, reply) => {
+    const path = request.url.split('?')[0];
+    if (path === '/health' || path === '/v1/health' || path === '/ready' || path === '/v1/ready') return;
+    const now = Date.now();
+    const key = request.ip;
+    const current = rateBuckets.get(key);
+    const bucket = !current || now - current.startedAt >= config.RATE_LIMIT_WINDOW_MS
+      ? { startedAt: now, count: 0 }
+      : current;
+    bucket.count += 1;
+    rateBuckets.set(key, bucket);
+    if (bucket.count > config.RATE_LIMIT_MAX_REQUESTS) {
+      const response: ErrorEnvelope = {
+        error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.', retryable: true },
+        requestId: requestId(request.id),
+      };
+      return reply.status(429).send(response);
+    }
+  });
+
   const healthHandler = async (request: { id: string | number }) => {
     const response = {
       data: {
