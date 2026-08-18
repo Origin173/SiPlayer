@@ -12,5 +12,6 @@ export const neteaseEndpoints = {
   userPlaylist: '/user/playlist',
   userRecord: '/user/record',
   like: '/like',
+  likeList: '/likelist',
   logout: '/logout',
 } as const;

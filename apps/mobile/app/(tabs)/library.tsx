@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth';
-import { useRecentTracks, useUserPlaylists } from '@/api/hooks';
+import { useLikedTracks, useRecentTracks, useUserPlaylists } from '@/api/hooks';
 import { PlaylistCard, SongRow } from '@/components/music';
 import { AppCard, Button, EmptyState, ErrorState, Screen, Skeleton } from '@/components/ui';
 import { loadLocalHistory } from '@/features/localHistory';
@@ -19,6 +19,7 @@ export default function LibraryScreen() {
   const [localHistory, setLocalHistory] = useState<Track[]>([]);
   const playlists = useUserPlaylists(auth.isAuthenticated && !auth.isHydrating);
   const cloudRecent = useRecentTracks(auth.isAuthenticated && !auth.isHydrating);
+  const likedTracks = useLikedTracks(auth.isAuthenticated && !auth.isHydrating);
   const recentTracks = useMemo(() => {
     const cloudItems = cloudRecent.data?.items ?? [];
     return cloudItems.length > 0 ? cloudItems : localHistory;
@@ -68,6 +69,16 @@ export default function LibraryScreen() {
               ))}
             </ScrollView>
           )}
+        </>
+      ) : null}
+
+      {auth.isAuthenticated ? (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>喜欢的音乐</Text>
+            <Text style={[styles.sectionAction, { color: theme.colors.textSecondary }]}>{likedTracks.data?.items.length ?? 0} 首</Text>
+          </View>
+          {likedTracks.isPending ? <Skeleton height={68} /> : likedTracks.isError ? <ErrorState onRetry={() => void likedTracks.refetch()} /> : likedTracks.data.items.length > 0 ? likedTracks.data.items.slice(0, 10).map((track) => <SongRow key={track.id} onPress={() => player.playTrack(queueItemFromTrack(track))} track={track} />) : <EmptyState message="喜欢的歌曲会出现在这里。" title="还没有喜欢的音乐" />}
         </>
       ) : null}
 

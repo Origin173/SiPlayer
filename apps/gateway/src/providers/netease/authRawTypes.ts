@@ -51,3 +51,9 @@ export type RawRecentTracksResponse = z.infer<typeof RawRecentTracksResponseSche
 
 export const RawLikeResponseSchema = z.object({ code: z.number().optional() }).passthrough();
 export type RawLikeResponse = z.infer<typeof RawLikeResponseSchema>;
+
+export const RawLikeListResponseSchema = z.object({
+  code: z.number().optional(),
+  ids: z.array(NumericIdSchema).default([]),
+}).passthrough();
+export type RawLikeListResponse = z.infer<typeof RawLikeListResponseSchema>;

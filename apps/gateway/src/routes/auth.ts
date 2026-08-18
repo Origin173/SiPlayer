@@ -146,6 +146,17 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     }
   });
 
+  app.get('/v1/me/liked-tracks', async (request, reply) => {
+    const auth = getSession(request, options.sessions);
+    if (isApiError(auth)) return sendError(reply, request, auth);
+    try {
+      const items: Track[] = await options.provider.getLikedTracks(auth.session.user.id, auth.session.cookie);
+      return { data: { items, page: 1, pageSize: items.length || 1, hasMore: false }, requestId: requestId(request) };
+    } catch (error) {
+      return sendError(reply, request, normalizeProviderError(error));
+    }
+  });
+
   app.get('/v1/me/recent-tracks', async (request, reply) => {
     const auth = getSession(request, options.sessions);
     if (isApiError(auth)) return sendError(reply, request, auth);

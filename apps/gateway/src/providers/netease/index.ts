@@ -3,6 +3,7 @@ import { NeteaseApiClient } from './client';
 import { neteaseEndpoints } from './endpoints';
 import { NeteaseProviderError } from './errors';
 import {
+  RawLikeListResponseSchema,
   RawLoginStatusResponseSchema,
   RawLikeResponseSchema,
   RawQrCheckResponseSchema,
@@ -42,6 +43,7 @@ export interface AuthProvider {
   getCurrentUser: (cookie: string) => Promise<UserProfile>;
   getUserPlaylists: (userId: string, cookie: string) => Promise<PlaylistCollections>;
   getRecentTracks: (userId: string, cookie: string) => Promise<Track[]>;
+  getLikedTracks: (userId: string, cookie: string) => Promise<Track[]>;
   setTrackLiked: (trackId: string, liked: boolean, cookie: string) => Promise<boolean>;
 }
 
@@ -204,6 +206,24 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
       cookie,
     );
     return mapRecentTracks(raw);
+  }
+
+  async getLikedTracks(userId: string, cookie: string): Promise<Track[]> {
+    const idsResponse = await this.client.get(
+      neteaseEndpoints.likeList,
+      { uid: userId },
+      (payload) => RawLikeListResponseSchema.parse(payload),
+      cookie,
+    );
+    if (idsResponse.ids.length === 0) return [];
+    const detail = await this.client.get(
+      neteaseEndpoints.trackDetail,
+      { ids: idsResponse.ids.join(',') },
+      (payload) => RawTrackDetailResponseSchema.parse(payload),
+      cookie,
+    );
+    const privileges = new Map(detail.privileges.map((privilege) => [privilege.id, privilege]));
+    return detail.songs.map((song) => mapDetailTrack(song, privileges.get(song.id)));
   }
 
   async setTrackLiked(trackId: string, liked: boolean, cookie: string): Promise<boolean> {

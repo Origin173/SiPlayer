@@ -44,6 +44,7 @@ const authProvider: AuthProvider = {
   getCurrentUser: async () => user,
   getUserPlaylists: async (): Promise<PlaylistCollections> => playlists,
   getRecentTracks: async (): Promise<Track[]> => [track],
+  getLikedTracks: async (): Promise<Track[]> => [track],
   setTrackLiked: async (_id: string, liked: boolean): Promise<boolean> => liked,
 };
 
@@ -70,6 +71,10 @@ describe('auth routes', () => {
     const me = await app.inject({ method: 'GET', url: '/v1/auth/me', headers: { authorization: `Bearer ${authorizedBody.data.sessionToken}` } });
     expect(me.statusCode).toBe(200);
     expect(me.json<{ data: UserProfile }>().data).toEqual(user);
+
+    const liked = await app.inject({ method: 'GET', url: '/v1/me/liked-tracks', headers: { authorization: `Bearer ${authorizedBody.data.sessionToken}` } });
+    expect(liked.statusCode).toBe(200);
+    expect(liked.json<{ data: { items: Track[] } }>().data.items[0]?.id).toBe('track-1');
 
     const logout = await app.inject({ method: 'POST', url: '/v1/auth/logout', headers: { authorization: `Bearer ${authorizedBody.data.sessionToken}` } });
     expect(logout.json<{ data: { ok: boolean } }>().data.ok).toBe(true);

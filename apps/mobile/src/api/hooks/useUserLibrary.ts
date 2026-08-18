@@ -15,6 +15,18 @@ export function useUserPlaylists(enabled = true) {
   });
 }
 
+export function useLikedTracks(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.me.liked,
+    queryFn: async ({ signal }) => {
+      const response = await apiClient.request('/v1/me/liked-tracks', { signal }, TrackPageSchema);
+      return response.data;
+    },
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
 export function useRecentTracks(enabled = true) {
   return useQuery({
     queryKey: queryKeys.me.recent,
