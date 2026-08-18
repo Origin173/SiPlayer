@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import searchFixture from './fixtures/search.json';
 import lyricsFixture from './fixtures/lyrics.json';
-import { mapLyrics, mapSearchResponse, parseLrc } from './mapper';
-import { RawLyricsResponseSchema, RawSearchResponseSchema } from './rawTypes';
+import streamFixture from './fixtures/stream.json';
+import { mapLyrics, mapSearchResponse, mapStream, parseLrc } from './mapper';
+import { RawLyricsResponseSchema, RawSearchResponseSchema, RawStreamResponseSchema } from './rawTypes';
+import type { AudioQuality } from '@siplayer/contracts';
 
 describe('netease mapper', () => {
   it('maps search raw fields into the stable Track contract', () => {
@@ -33,5 +35,18 @@ describe('netease mapper', () => {
       { startMs: 1000, text: 'same' },
       { startMs: 2000, text: 'same' },
     ]);
+  });
+
+  it('maps a temporary stream URL without exposing upstream fields', () => {
+    const raw = RawStreamResponseSchema.parse(streamFixture);
+    const stream = mapStream(raw, '123456', 'auto' satisfies AudioQuality);
+
+    expect(stream).toMatchObject({
+      trackId: '123456',
+      url: 'https://audio.example.com/track-123456.mp3',
+      requestedQuality: 'auto',
+      actualQuality: 'high',
+      bitrate: 320000,
+    });
   });
 });

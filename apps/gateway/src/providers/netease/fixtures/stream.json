@@ -1,0 +1,14 @@
+{
+  "code": 200,
+  "data": [
+    {
+      "id": 123456,
+      "url": "https://audio.example.com/track-123456.mp3",
+      "br": 320000,
+      "size": 10485760,
+      "type": "mp3",
+      "expi": 1200,
+      "code": 200
+    }
+  ]
+}

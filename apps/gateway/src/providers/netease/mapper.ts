@@ -1,8 +1,10 @@
 import type {
   AlbumSummary,
   ArtistSummary,
+  AudioQuality,
   Lyrics,
   PlaylistDetail,
+  StreamInfo,
   Track,
   TrackPage,
 } from '@siplayer/contracts';
@@ -14,6 +16,7 @@ import type {
   RawPrivilege,
   RawSearchResponse,
   RawSong,
+  RawStreamResponse,
 } from './rawTypes';
 
 function safeUrl(value: string | null | undefined): string | null {
@@ -90,6 +93,39 @@ export function mapTrackDetail(raw: RawSearchResponse | { result?: { songs?: Raw
 
 export function mapDetailTrack(song: RawSong, privilege?: RawPrivilege): Track {
   return mapTrack(song, privilege ?? song.privilege);
+}
+
+function qualityFromBitrate(bitrate: number | null | undefined, fallback: AudioQuality): AudioQuality {
+  if (bitrate == null) return fallback === 'auto' ? 'standard' : fallback;
+  if (bitrate >= 900_000) return 'hi_res';
+  if (bitrate >= 500_000) return 'lossless';
+  if (bitrate >= 300_000) return 'high';
+  return 'standard';
+}
+
+export function mapStream(
+  raw: RawStreamResponse,
+  trackId: string,
+  requestedQuality: AudioQuality,
+): StreamInfo | null {
+  const item = raw.data.find((candidate) => candidate.id === trackId) ?? raw.data[0];
+  const url = safeUrl(item?.url);
+  if (!item || !url) return null;
+
+  return {
+    trackId,
+    url,
+    requestedQuality,
+    actualQuality: qualityFromBitrate(item.br, requestedQuality),
+    mimeType: item.type
+      ? item.type.startsWith('audio/')
+        ? item.type
+        : `audio/${item.type}`
+      : null,
+    bitrate: item.br ?? null,
+    sizeBytes: item.size ?? null,
+    expiresAt: item.expi ? new Date(Date.now() + item.expi * 1000).toISOString() : null,
+  };
 }
 
 function parseTimestamp(value: string): number | null {

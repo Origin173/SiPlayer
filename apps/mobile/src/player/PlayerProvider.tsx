@@ -1,5 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, type PropsWithChildren } from 'react';
-import type { QueueItem, PlayContext, PlaybackMode } from './playbackTypes';
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
+import { ApiError } from '@/api/client';
+import { resolveStream } from './playbackResolver';
+import type { PlayContext, PlaybackMode, QueueItem } from './playbackTypes';
 import { usePlayerStore } from './playerStore';
 
 export interface PlayerController {
@@ -21,35 +24,100 @@ export interface PlayerController {
 const PlayerContext = createContext<PlayerController | null>(null);
 
 export function PlayerProvider({ children }: PropsWithChildren) {
+  const audioPlayer = useAudioPlayer(null, { updateInterval: 500, keepAudioSessionActive: true });
+  const audioStatus = useAudioPlayerStatus(audioPlayer);
   const setQueue = usePlayerStore((state) => state.setQueue);
   const setPlaybackState = usePlayerStore((state) => state.setPlaybackState);
   const setPlaybackMode = usePlayerStore((state) => state.setPlaybackMode);
   const setPosition = usePlayerStore((state) => state.setPosition);
   const setCurrentIndex = usePlayerStore((state) => state.setCurrentIndex);
   const clear = usePlayerStore((state) => state.clear);
-  const queue = usePlayerStore((state) => state.queue);
-  const currentIndex = usePlayerStore((state) => state.currentIndex);
-  const playbackState = usePlayerStore((state) => state.playbackState);
+  const generationRef = useRef(0);
+  const resolvedTrackIdRef = useRef<string | null>(null);
+  const streamRetryCountRef = useRef(0);
+  const finishHandledGenerationRef = useRef(-1);
+  const nextRef = useRef<() => void>(() => undefined);
+
+  useEffect(() => {
+    void setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: 'doNotMix',
+    }).catch(() => undefined);
+  }, []);
+
+  const resolveAndPlay = useCallback(
+    async (item: QueueItem, isRetry = false) => {
+      const generation = ++generationRef.current;
+      if (!isRetry) streamRetryCountRef.current = 0;
+      resolvedTrackIdRef.current = null;
+      setPlaybackState('resolving');
+
+      try {
+        const stream = await resolveStream(item.trackId);
+        if (generation !== generationRef.current) return;
+        audioPlayer.replace({ uri: stream.url, name: item.title });
+        audioPlayer.setActiveForLockScreen(true, {
+          title: item.title,
+          artist: item.artistText,
+          ...(item.albumTitle ? { albumTitle: item.albumTitle } : {}),
+          ...(item.artworkUrl ? { artworkUrl: item.artworkUrl } : {}),
+        });
+        resolvedTrackIdRef.current = item.trackId;
+        setPlaybackState('loading');
+        audioPlayer.play();
+      } catch (error) {
+        if (generation !== generationRef.current) return;
+        resolvedTrackIdRef.current = null;
+        setPlaybackState(error instanceof ApiError && error.code === 'TRACK_UNAVAILABLE' ? 'unavailable' : 'error');
+      }
+    },
+    [audioPlayer, setPlaybackState],
+  );
+
+  const goToIndex = useCallback(
+    (index: number, items = usePlayerStore.getState().queue) => {
+      const item = items[index];
+      if (!item) return;
+      setCurrentIndex(index);
+      void resolveAndPlay(item);
+    },
+    [resolveAndPlay, setCurrentIndex],
+  );
 
   const play = useCallback(() => {
-    if (queue.length > 0) setPlaybackState('playing');
-  }, [queue.length, setPlaybackState]);
+    const state = usePlayerStore.getState();
+    const item = state.queue[state.currentIndex];
+    if (!item) return;
+    if (resolvedTrackIdRef.current === item.trackId) {
+      audioPlayer.play();
+      setPlaybackState('playing');
+    } else {
+      void resolveAndPlay(item);
+    }
+  }, [audioPlayer, resolveAndPlay, setPlaybackState]);
 
   const pause = useCallback(() => {
-    if (queue.length > 0) setPlaybackState('paused');
-  }, [queue.length, setPlaybackState]);
+    if (usePlayerStore.getState().queue.length === 0) return;
+    audioPlayer.pause();
+    setPlaybackState('paused');
+  }, [audioPlayer, setPlaybackState]);
 
   const toggle = useCallback(() => {
-    if (queue.length === 0) return;
-    setPlaybackState(playbackState === 'playing' ? 'paused' : 'playing');
-  }, [playbackState, queue.length, setPlaybackState]);
+    const state = usePlayerStore.getState();
+    if (state.queue.length === 0) return;
+    if (state.playbackState === 'playing') pause();
+    else play();
+  }, [pause, play]);
 
   const setPlayerQueue = useCallback(
     (items: QueueItem[], startIndex = 0) => {
       setQueue(items, startIndex);
-      if (items.length > 0) setPlaybackState('playing');
+      const safeIndex = items.length > 0 ? Math.min(Math.max(startIndex, 0), items.length - 1) : -1;
+      const item = items[safeIndex];
+      if (item) void resolveAndPlay(item);
     },
-    [setPlaybackState, setQueue],
+    [resolveAndPlay, setQueue],
   );
 
   const playTrack = useCallback(
@@ -57,64 +125,140 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       if (context?.queue && context.queue.length > 0) {
         const requestedIndex = context.startIndex ?? context.queue.findIndex((item) => item.trackId === track.trackId);
         setPlayerQueue(context.queue, requestedIndex >= 0 ? requestedIndex : 0);
-        return;
+      } else {
+        setPlayerQueue([track], 0);
       }
-      setPlayerQueue([track], 0);
     },
     [setPlayerQueue],
   );
 
   const next = useCallback(() => {
-    if (queue.length === 0) return;
-    const nextIndex = currentIndex + 1;
-    if (nextIndex >= queue.length) {
-      setPlaybackState('ended');
+    const state = usePlayerStore.getState();
+    if (state.queue.length === 0) return;
+    if (state.playbackMode === 'repeat_one') {
+      goToIndex(state.currentIndex);
       return;
     }
-    setCurrentIndex(nextIndex);
-    setPlaybackState('playing');
-  }, [currentIndex, queue.length, setCurrentIndex, setPlaybackState]);
+    if (state.playbackMode === 'shuffle' && state.queue.length > 1) {
+      const candidates = state.queue.map((_, index) => index).filter((index) => index !== state.currentIndex);
+      const randomIndex = candidates[Math.floor(Math.random() * candidates.length)];
+      if (randomIndex != null) goToIndex(randomIndex);
+      return;
+    }
+    const nextIndex = state.currentIndex + 1;
+    if (nextIndex >= state.queue.length) {
+      if (state.playbackMode === 'repeat_all') {
+        goToIndex(0);
+      } else {
+        audioPlayer.pause();
+        setPlaybackState('ended');
+      }
+      return;
+    }
+    goToIndex(nextIndex);
+  }, [audioPlayer, goToIndex, setPlaybackState]);
+  nextRef.current = next;
 
   const previous = useCallback(() => {
-    if (queue.length === 0) return;
-    if (usePlayerStore.getState().positionMs > 4000) {
+    const state = usePlayerStore.getState();
+    if (state.queue.length === 0) return;
+    if (state.positionMs > 4_000) {
+      void audioPlayer.seekTo(0);
       setPosition(0);
       return;
     }
-    const previousIndex = Math.max(currentIndex - 1, 0);
-    setCurrentIndex(previousIndex);
-    setPlaybackState('playing');
-  }, [currentIndex, queue.length, setCurrentIndex, setPlaybackState, setPosition]);
+    goToIndex(Math.max(state.currentIndex - 1, 0));
+  }, [audioPlayer, goToIndex, setPosition]);
 
   const addNext = useCallback(
     (item: QueueItem) => {
-      const nextQueue = [...queue];
-      nextQueue.splice(Math.max(currentIndex + 1, 0), 0, item);
-      setQueue(nextQueue, currentIndex < 0 ? 0 : currentIndex);
+      const state = usePlayerStore.getState();
+      const nextQueue = [...state.queue];
+      nextQueue.splice(Math.max(state.currentIndex + 1, 0), 0, item);
+      setQueue(nextQueue, state.currentIndex < 0 ? 0 : state.currentIndex);
+      setPlaybackState(state.playbackState);
     },
-    [currentIndex, queue, setQueue],
+    [setPlaybackState, setQueue],
   );
 
   const addToQueue = useCallback(
     (item: QueueItem) => {
-      setQueue([...queue, item], currentIndex < 0 ? 0 : currentIndex);
+      const state = usePlayerStore.getState();
+      setQueue([...state.queue, item], state.currentIndex < 0 ? 0 : state.currentIndex);
+      setPlaybackState(state.playbackState);
     },
-    [currentIndex, queue, setQueue],
+    [setPlaybackState, setQueue],
   );
 
   const removeFromQueue = useCallback(
     (index: number) => {
-      if (index < 0 || index >= queue.length) return;
-      const nextQueue = queue.filter((_, itemIndex) => itemIndex !== index);
-      const nextIndex = nextQueue.length === 0 ? -1 : Math.min(currentIndex > index ? currentIndex - 1 : currentIndex, nextQueue.length - 1);
-      if (nextQueue.length === 0) clear();
-      else {
-        setQueue(nextQueue, Math.max(nextIndex, 0));
-        if (nextIndex < 0) setPlaybackState('idle');
+      const state = usePlayerStore.getState();
+      if (index < 0 || index >= state.queue.length) return;
+      const nextQueue = state.queue.filter((_, itemIndex) => itemIndex !== index);
+      if (nextQueue.length === 0) {
+        clear();
+        audioPlayer.pause();
+        audioPlayer.clearLockScreenControls();
+        resolvedTrackIdRef.current = null;
+        return;
+      }
+      const nextIndex = Math.min(state.currentIndex > index ? state.currentIndex - 1 : state.currentIndex, nextQueue.length - 1);
+      setQueue(nextQueue, Math.max(nextIndex, 0));
+      if (index === state.currentIndex) {
+        const nextItem = nextQueue[Math.max(nextIndex, 0)];
+        if (nextItem) void resolveAndPlay(nextItem);
+      } else {
+        setPlaybackState(state.playbackState);
       }
     },
-    [clear, currentIndex, queue, setPlaybackState, setQueue],
+    [audioPlayer, clear, resolveAndPlay, setPlaybackState, setQueue],
   );
+
+  const clearQueue = useCallback(() => {
+    generationRef.current += 1;
+    resolvedTrackIdRef.current = null;
+    clear();
+    audioPlayer.pause();
+    audioPlayer.clearLockScreenControls();
+  }, [audioPlayer, clear]);
+
+  const seekTo = useCallback(
+    (positionMs: number) => {
+      const nextPosition = Math.max(positionMs, 0);
+      setPosition(nextPosition);
+      void audioPlayer.seekTo(nextPosition / 1000).catch(() => setPlaybackState('error'));
+    },
+    [audioPlayer, setPlaybackState, setPosition],
+  );
+
+  useEffect(() => {
+    const state = usePlayerStore.getState();
+    const current = state.queue[state.currentIndex];
+    if (!current) return;
+
+    const durationMs = audioStatus.duration > 0 ? Math.floor(audioStatus.duration * 1000) : current.durationMs ?? 0;
+    setPosition(Math.floor(audioStatus.currentTime * 1000), durationMs);
+
+    if (audioStatus.error) {
+      if (streamRetryCountRef.current === 0 && resolvedTrackIdRef.current === current.trackId) {
+        streamRetryCountRef.current = 1;
+        void resolveAndPlay(current, true);
+      } else {
+        setPlaybackState('error');
+      }
+      return;
+    }
+    if (audioStatus.didJustFinish) {
+      if (finishHandledGenerationRef.current !== generationRef.current) {
+        finishHandledGenerationRef.current = generationRef.current;
+        nextRef.current();
+      }
+      return;
+    }
+    if (audioStatus.isBuffering) setPlaybackState('buffering');
+    else if (audioStatus.playing) setPlaybackState('playing');
+    else if (audioStatus.isLoaded && state.playbackState !== 'resolving') setPlaybackState('paused');
+  }, [audioStatus, resolveAndPlay, setPlaybackState, setPosition]);
 
   const controller = useMemo<PlayerController>(
     () => ({
@@ -122,17 +266,17 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       play,
       pause,
       toggle,
-      seekTo: (positionMs) => setPosition(Math.max(positionMs, 0)),
+      seekTo,
       next,
       previous,
       setQueue: setPlayerQueue,
       addNext,
       addToQueue,
       removeFromQueue,
-      clearQueue: clear,
+      clearQueue,
       setMode: setPlaybackMode,
     }),
-    [addNext, addToQueue, clear, next, pause, play, playTrack, previous, setPlaybackMode, setPlayerQueue, setPosition, toggle],
+    [addNext, addToQueue, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, seekTo, setPlaybackMode, setPlayerQueue, toggle],
   );
 
   return <PlayerContext.Provider value={controller}>{children}</PlayerContext.Provider>;

@@ -102,3 +102,20 @@ export const RawPlaylistTracksResponseSchema = z.object({
   songs: z.array(RawSongSchema).default([]),
 }).passthrough();
 export type RawPlaylistTracksResponse = z.infer<typeof RawPlaylistTracksResponseSchema>;
+
+export const RawStreamItemSchema = z.object({
+  id: NumericIdSchema,
+  url: z.string().nullable().optional(),
+  br: z.number().nullable().optional(),
+  size: z.number().nullable().optional(),
+  type: z.string().nullable().optional(),
+  expi: z.number().nullable().optional(),
+  code: z.number().nullable().optional(),
+}).passthrough();
+export type RawStreamItem = z.infer<typeof RawStreamItemSchema>;
+
+export const RawStreamResponseSchema = z.object({
+  code: z.number().optional(),
+  data: z.array(RawStreamItemSchema).default([]),
+}).passthrough();
+export type RawStreamResponse = z.infer<typeof RawStreamResponseSchema>;

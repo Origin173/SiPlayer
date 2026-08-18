@@ -17,6 +17,7 @@ export interface QueueItem {
   trackId: string;
   title: string;
   artistText: string;
+  albumTitle?: string | null;
   artworkUrl?: string | null;
   durationMs?: number | null;
 }
@@ -31,6 +32,7 @@ export function queueItemFromTrack(track: Track): QueueItem {
     trackId: track.id,
     title: track.name,
     artistText: track.artistText,
+    albumTitle: track.album?.name ?? null,
     artworkUrl: track.artworkUrl,
     durationMs: track.durationMs,
   };

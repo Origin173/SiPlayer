@@ -1,4 +1,4 @@
-import type { Lyrics, PlaylistDetail, Track, TrackPage } from '@siplayer/contracts';
+import type { AudioQuality, Lyrics, PlaylistDetail, StreamInfo, Track, TrackPage } from '@siplayer/contracts';
 import { NeteaseApiClient } from './client';
 import { neteaseEndpoints } from './endpoints';
 import { NeteaseProviderError } from './errors';
@@ -7,12 +7,14 @@ import {
   mapLyrics,
   mapPlaylist,
   mapSearchResponse,
+  mapStream,
 } from './mapper';
 import {
   RawLyricsResponseSchema,
   RawPlaylistDetailResponseSchema,
   RawPlaylistTracksResponseSchema,
   RawSearchResponseSchema,
+  RawStreamResponseSchema,
   RawTrackDetailResponseSchema,
 } from './rawTypes';
 
@@ -21,6 +23,7 @@ export interface ContentProvider {
   getTrack: (id: string) => Promise<Track>;
   getLyrics: (id: string) => Promise<Lyrics>;
   getPlaylist: (id: string) => Promise<PlaylistDetail>;
+  resolveStream: (id: string, quality: AudioQuality) => Promise<StreamInfo>;
 }
 
 export class NeteaseProvider implements ContentProvider {
@@ -77,6 +80,26 @@ export class NeteaseProvider implements ContentProvider {
     }
     const tracks = songs.map((song) => mapDetailTrack(song, song.privilege));
     return mapPlaylist(raw.playlist, tracks);
+  }
+
+  async resolveStream(id: string, quality: AudioQuality): Promise<StreamInfo> {
+    const level = {
+      auto: 'exhigh',
+      standard: 'standard',
+      high: 'higher',
+      lossless: 'lossless',
+      hi_res: 'hires',
+    }[quality];
+    const raw = await this.client.get(
+      neteaseEndpoints.stream,
+      { id, level },
+      (payload) => RawStreamResponseSchema.parse(payload),
+    );
+    const stream = mapStream(raw, id, quality);
+    if (!stream) {
+      throw new NeteaseProviderError('TRACK_UNAVAILABLE', 'This track is currently unavailable.', false, 422);
+    }
+    return stream;
   }
 }
 

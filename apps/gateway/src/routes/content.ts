@@ -1,4 +1,4 @@
-import type { ApiError, ErrorEnvelope } from '@siplayer/contracts';
+import { AudioQualitySchema, type ApiError, type ErrorEnvelope } from '@siplayer/contracts';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { NeteaseProviderError, type ContentProvider } from '../providers';
@@ -11,6 +11,7 @@ const searchQuerySchema = z.object({
 }).strict();
 
 const idParamsSchema = z.object({ id: z.string().trim().min(1) });
+const streamQuerySchema = z.object({ quality: AudioQualitySchema.default('auto') }).strict();
 
 interface ContentRouteOptions {
   provider: ContentProvider;
@@ -24,6 +25,9 @@ function errorStatus(code: ApiError['code']): number {
       return 504;
     case 'UPSTREAM_UNAVAILABLE':
       return 502;
+    case 'TRACK_UNAVAILABLE':
+    case 'QUALITY_UNAVAILABLE':
+      return 422;
     case 'VALIDATION_ERROR':
       return 400;
     default:
@@ -93,6 +97,25 @@ export function registerContentRoutes(app: FastifyInstance, options: ContentRout
 
     try {
       const data = await options.provider.getTrack(parsed.data.id);
+      return { data, requestId: requestId(request) };
+    } catch (error) {
+      return sendError(reply, request, normalizeProviderError(error));
+    }
+  });
+
+  app.get('/v1/tracks/:id/stream', async (request, reply) => {
+    const params = idParamsSchema.safeParse(request.params);
+    const query = streamQuerySchema.safeParse(request.query);
+    if (!params.success || !query.success) {
+      return sendError(reply, request, {
+        code: 'VALIDATION_ERROR',
+        message: 'Stream request is invalid.',
+        retryable: false,
+      });
+    }
+
+    try {
+      const data = await options.provider.resolveStream(params.data.id, query.data.quality);
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));

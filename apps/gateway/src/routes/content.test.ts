@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import type { Lyrics, PlaylistDetail, Track, TrackPage } from '@siplayer/contracts';
+import type { AudioQuality, Lyrics, PlaylistDetail, StreamInfo, Track, TrackPage } from '@siplayer/contracts';
 import { buildApp } from '../app';
 import { NeteaseProviderError, type ContentProvider } from '../providers';
 import { loadConfig } from '../config/env';
@@ -20,6 +20,12 @@ const provider: ContentProvider = {
   getTrack: async () => track,
   getLyrics: async (): Promise<Lyrics> => ({ type: 'NONE', lines: [] }),
   getPlaylist: async (): Promise<PlaylistDetail> => ({ id: 'playlist-1', name: 'Focus', tracks: [] }),
+  resolveStream: async (id: string, quality: AudioQuality): Promise<StreamInfo> => ({
+    trackId: id,
+    url: 'https://audio.example.com/track.mp3',
+    requestedQuality: quality,
+    actualQuality: 'high',
+  }),
 };
 
 const app = buildApp(loadConfig({ NODE_ENV: 'test' }), { logger: false, provider });
@@ -44,6 +50,15 @@ describe('content routes', () => {
 
     expect(response.statusCode).toBe(400);
     expect(body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('resolves a temporary stream URL through the stable contract', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/tracks/track-1/stream?quality=high' });
+    const body = response.json<{ data: StreamInfo; requestId: string }>();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.data).toMatchObject({ trackId: 'track-1', requestedQuality: 'high', actualQuality: 'high' });
+    expect(body.requestId).toMatch(/^req_/);
   });
 
   it('maps provider timeout to the stable error model', async () => {
