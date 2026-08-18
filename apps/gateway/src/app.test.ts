@@ -27,6 +27,19 @@ describe('gateway foundation routes', () => {
     expect(body.data.upstream).toBe('configured');
   });
 
+  it('rate limits non-health requests while keeping health available', async () => {
+    const limited = buildApp(loadConfig({ NODE_ENV: 'test', RATE_LIMIT_MAX_REQUESTS: '1' }), { logger: false });
+    const health = await limited.inject({ method: 'GET', url: '/v1/health' });
+    const first = await limited.inject({ method: 'GET', url: '/v1/does-not-exist' });
+    const second = await limited.inject({ method: 'GET', url: '/v1/does-not-exist' });
+    await limited.close();
+
+    expect(health.statusCode).toBe(200);
+    expect(first.statusCode).toBe(404);
+    expect(second.statusCode).toBe(429);
+    expect(second.json<{ error: { code: string } }>().error.code).toBe('RATE_LIMITED');
+  });
+
   it('normalizes unknown routes', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/does-not-exist' });
     const body = response.json<{ error: { code: string }; requestId: string }>();

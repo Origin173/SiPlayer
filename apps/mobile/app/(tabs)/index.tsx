@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '@/auth';
 import { useRecentTracks, useUserPlaylists } from '@/api/hooks';
-import { AppCard, Button, EmptyState, IconButton, Screen, Skeleton } from '@/components/ui';
+import { AppCard, Button, EmptyState, ErrorState, IconButton, Screen, Skeleton } from '@/components/ui';
 import { PlaylistCard, SongRow } from '@/components/music';
 import { loadLocalHistory } from '@/features/localHistory';
 import { queueItemFromTrack } from '@/player/playbackTypes';
@@ -64,7 +64,9 @@ export default function HomeScreen() {
         <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>最近播放</Text>
         <Text style={[styles.sectionAction, { color: theme.colors.primary }]}>{auth.isAuthenticated && recentQuery.data ? '云端 + 本机' : '本机记录'}</Text>
       </View>
-      {auth.isAuthenticated && recentQuery.isPending ? (
+      {auth.isAuthenticated && recentQuery.isError ? (
+        <ErrorState onRetry={() => void recentQuery.refetch()} />
+      ) : auth.isAuthenticated && recentQuery.isPending ? (
         <View style={styles.loadingRows}><Skeleton height={68} /><Skeleton height={68} /></View>
       ) : recentTracks.length > 0 ? (
         <View>{recentTracks.slice(0, 3).map((track) => <SongRow key={track.id} onPress={() => playTrack(track.id)} track={track} />)}</View>
