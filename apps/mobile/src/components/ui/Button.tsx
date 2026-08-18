@@ -6,9 +6,10 @@ interface ButtonProps extends PropsWithChildren {
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'text';
   accessibilityLabel?: string;
+  disabled?: boolean;
 }
 
-export function Button({ children, onPress, variant = 'primary', accessibilityLabel }: ButtonProps) {
+export function Button({ children, onPress, variant = 'primary', accessibilityLabel, disabled = false }: ButtonProps) {
   const { theme } = useTheme();
   const isPrimary = variant === 'primary';
   const isText = variant === 'text';
@@ -17,6 +18,7 @@ export function Button({ children, onPress, variant = 'primary', accessibilityLa
     <Pressable
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => {
         const backgroundColor = isPrimary
@@ -34,7 +36,7 @@ export function Button({ children, onPress, variant = 'primary', accessibilityLa
             backgroundColor,
             borderColor: isPrimary || isText ? 'transparent' : theme.colors.border,
             borderWidth: isPrimary || isText ? 0 : 1,
-            opacity: pressed ? 0.92 : 1,
+            opacity: disabled ? 0.45 : pressed ? 0.92 : 1,
           },
           isText && styles.textButton,
         ];
