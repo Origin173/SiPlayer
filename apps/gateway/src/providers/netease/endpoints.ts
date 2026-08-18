@@ -5,4 +5,12 @@ export const neteaseEndpoints = {
   playlistDetail: '/playlist/detail',
   playlistTracks: '/playlist/track/all',
   stream: '/song/url/v1',
+  qrKey: '/login/qr/key',
+  qrCreate: '/login/qr/create',
+  qrCheck: '/login/qr/check',
+  loginStatus: '/login/status',
+  userPlaylist: '/user/playlist',
+  userRecord: '/user/record',
+  like: '/like',
+  logout: '/logout',
 } as const;

@@ -26,6 +26,7 @@ export class NeteaseApiClient {
     path: string,
     query: Record<string, QueryValue>,
     parse: (payload: unknown) => T,
+    cookieOverride?: string,
   ): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`);
     for (const [key, value] of Object.entries(query)) {
@@ -35,7 +36,7 @@ export class NeteaseApiClient {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
-      const cookie = this.getCookie ? await this.getCookie() : undefined;
+      const cookie = cookieOverride ?? (this.getCookie ? await this.getCookie() : undefined);
       const response = await this.fetchImpl(url, {
         headers: {
           Accept: 'application/json',

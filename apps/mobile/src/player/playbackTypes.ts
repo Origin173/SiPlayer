@@ -16,6 +16,7 @@ export type PlaybackMode = 'sequential' | 'repeat_all' | 'repeat_one' | 'shuffle
 export interface QueueItem {
   trackId: string;
   title: string;
+  track?: Track;
   artistText: string;
   albumTitle?: string | null;
   artworkUrl?: string | null;
@@ -31,6 +32,7 @@ export function queueItemFromTrack(track: Track): QueueItem {
   return {
     trackId: track.id,
     title: track.name,
+    track,
     artistText: track.artistText,
     albumTitle: track.album?.name ?? null,
     artworkUrl: track.artworkUrl,

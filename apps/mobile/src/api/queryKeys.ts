@@ -13,5 +13,6 @@ export const queryKeys = {
   me: {
     profile: ['me', 'profile'] as const,
     playlists: ['me', 'playlists'] as const,
+    recent: ['me', 'recent-tracks'] as const,
   },
 };

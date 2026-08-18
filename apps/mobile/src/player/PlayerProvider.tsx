@@ -1,6 +1,7 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
 import { ApiError } from '@/api/client';
+import { recordLocalTrack } from '@/features/localHistory';
 import { resolveStream } from './playbackResolver';
 import type { PlayContext, PlaybackMode, QueueItem } from './playbackTypes';
 import { usePlayerStore } from './playerStore';
@@ -64,6 +65,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
           ...(item.artworkUrl ? { artworkUrl: item.artworkUrl } : {}),
         });
         resolvedTrackIdRef.current = item.trackId;
+        if (!isRetry && item.track) void recordLocalTrack(item.track);
         setPlaybackState('loading');
         audioPlayer.play();
       } catch (error) {

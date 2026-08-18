@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import type { z } from 'zod';
 import { ErrorEnvelopeSchema, SuccessEnvelopeSchema, type ApiErrorCode } from '@siplayer/contracts';
+import { getSessionToken } from '@/auth/session';
 
 function resolveGatewayUrl(): string {
   const configuredUrl = Constants.expoConfig?.extra?.gatewayUrl;
@@ -111,4 +112,4 @@ export class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient();
+export const apiClient = new ApiClient({ getToken: getSessionToken });

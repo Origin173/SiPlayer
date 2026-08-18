@@ -1,0 +1,91 @@
+import {
+  QrStartDataSchema,
+  QrStatusDataSchema,
+  UserProfileSchema,
+  type QrStartData,
+  type QrStatusData,
+  type UserProfile,
+} from '@siplayer/contracts';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { ApiError, apiClient } from '@/api/client';
+import { clearSessionToken, getSessionToken, setSessionToken } from './session';
+
+export interface AuthController {
+  user: UserProfile | null;
+  isHydrating: boolean;
+  isAuthenticated: boolean;
+  refresh: () => Promise<void>;
+  startQr: () => Promise<QrStartData>;
+  pollQr: (challengeId: string) => Promise<QrStatusData>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthController | null>(null);
+
+export function AuthProvider({ children }: PropsWithChildren) {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isHydrating, setIsHydrating] = useState(true);
+
+  const refresh = useCallback(async () => {
+    const token = await getSessionToken();
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    try {
+      const response = await apiClient.request('/v1/auth/me', undefined, UserProfileSchema);
+      setUser(response.data);
+    } catch (error) {
+      if (error instanceof ApiError && (error.code === 'AUTH_EXPIRED' || error.code === 'AUTH_REQUIRED')) {
+        await clearSessionToken();
+        setUser(null);
+        return;
+      }
+      throw error;
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh()
+      .catch(() => setUser(null))
+      .finally(() => setIsHydrating(false));
+  }, [refresh]);
+
+  const startQr = useCallback(async () => {
+    const response = await apiClient.request('/v1/auth/qr/start', { method: 'POST', body: '{}' }, QrStartDataSchema);
+    return response.data;
+  }, []);
+
+  const pollQr = useCallback(async (challengeId: string) => {
+    const response = await apiClient.request(`/v1/auth/qr/${encodeURIComponent(challengeId)}`, undefined, QrStatusDataSchema);
+    if (response.data.status === 'AUTHORIZED') {
+      await setSessionToken(response.data.sessionToken);
+      setUser(response.data.user);
+    }
+    return response.data;
+  }, []);
+
+  const logout = useCallback(async () => {
+    try {
+      if (await getSessionToken()) await apiClient.request('/v1/auth/logout', { method: 'POST', body: '{}' });
+    } catch {
+      // A revoked or expired server session is already logged out.
+    } finally {
+      await clearSessionToken();
+      setUser(null);
+    }
+  }, []);
+
+  const value = useMemo<AuthController>(
+    () => ({ user, isHydrating, isAuthenticated: Boolean(user), refresh, startQr, pollQr, logout }),
+    [isHydrating, logout, pollQr, refresh, startQr, user],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthController {
+  const value = useContext(AuthContext);
+  if (!value) throw new Error('useAuth must be used inside AuthProvider');
+  return value;
+}

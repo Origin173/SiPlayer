@@ -6,6 +6,8 @@ const envSchema = z.object({
   HOST: z.string().min(1).default('127.0.0.1'),
   API_VERSION: z.string().min(1).default('0.1.0'),
   NETEASE_API_BASE_URL: z.string().url().default('http://127.0.0.1:3000'),
+  SESSION_ENCRYPTION_KEY: z.string().min(16).default('dev-only-session-encryption-key'),
+  SESSION_TTL_MS: z.coerce.number().int().positive().default(30 * 24 * 60 * 60 * 1000),
 });
 
 export type GatewayConfig = z.infer<typeof envSchema>;

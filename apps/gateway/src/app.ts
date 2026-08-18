@@ -6,12 +6,15 @@ import {
 } from '@siplayer/contracts';
 import { randomUUID } from 'node:crypto';
 import { loadConfig, type GatewayConfig } from './config/env';
-import { NeteaseProvider, type ContentProvider } from './providers';
+import { QrChallengeStore, SessionStore } from './auth/stores';
+import { NeteaseProvider, type AuthProvider, type ContentProvider } from './providers';
+import { registerAuthRoutes } from './routes/auth';
 import { registerContentRoutes } from './routes/content';
 
 export interface BuildAppOptions {
   logger?: FastifyServerOptions['logger'];
   provider?: ContentProvider;
+  authProvider?: AuthProvider;
 }
 
 function requestId(value: string | number): string {
@@ -69,8 +72,12 @@ export function buildApp(
   app.get('/v1/ready', readyHandler);
   app.get('/ready', readyHandler);
 
-  registerContentRoutes(app, {
-    provider: options.provider ?? new NeteaseProvider({ baseUrl: config.NETEASE_API_BASE_URL }),
+  const provider = options.provider ?? new NeteaseProvider({ baseUrl: config.NETEASE_API_BASE_URL });
+  registerContentRoutes(app, { provider });
+  registerAuthRoutes(app, {
+    provider: options.authProvider ?? (provider as unknown as AuthProvider),
+    sessions: new SessionStore(config.SESSION_ENCRYPTION_KEY, config.SESSION_TTL_MS),
+    challenges: new QrChallengeStore(),
   });
 
   app.setNotFoundHandler(async (request, reply) => {

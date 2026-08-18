@@ -64,6 +64,18 @@ export const PlaylistSummarySchema = z.object({
 });
 export type PlaylistSummary = z.infer<typeof PlaylistSummarySchema>;
 
+export const PlaylistCollectionsSchema = z.object({
+  created: z.array(PlaylistSummarySchema),
+  subscribed: z.array(PlaylistSummarySchema),
+});
+export type PlaylistCollections = z.infer<typeof PlaylistCollectionsSchema>;
+
+export const LikeResultSchema = z.object({ liked: z.boolean() });
+export type LikeResult = z.infer<typeof LikeResultSchema>;
+
+export const OkDataSchema = z.object({ ok: z.literal(true) });
+export type OkData = z.infer<typeof OkDataSchema>;
+
 export const PlaylistDetailSchema = PlaylistSummarySchema.extend({
   tracks: z.array(TrackSchema),
   subscribed: z.boolean().optional(),

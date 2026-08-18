@@ -2,12 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ReactNode } from 'react';
+import { useAuth } from '@/auth';
 import { Button, IconButton, Screen } from '@/components/ui';
 import { useTheme } from '@/theme';
 
 export default function SettingsScreen() {
   const { theme, preference, setPreference } = useTheme();
   const router = useRouter();
+  const auth = useAuth();
 
   return (
     <Screen>
@@ -38,7 +40,12 @@ export default function SettingsScreen() {
         </View>
       </SettingsSection>
       <SettingsSection title="账户">
-        <Button onPress={() => router.push('/login')} variant="secondary">登录网易云音乐</Button>
+        {auth.isAuthenticated ? (
+          <>
+            <Text style={[styles.accountName, { color: theme.colors.textPrimary }]}>{auth.user?.nickname}</Text>
+            <Button onPress={() => void auth.logout()} variant="secondary">退出登录</Button>
+          </>
+        ) : <Button onPress={() => router.push('/login')} variant="secondary">登录网易云音乐</Button>}
       </SettingsSection>
       <SettingsSection title="关于">
         <Text style={[styles.about, { color: theme.colors.textSecondary }]}>SiPlayer 0.1.0</Text>
@@ -86,5 +93,6 @@ const styles = StyleSheet.create({
   segment: { borderRadius: 999, flexDirection: 'row', gap: 4, margin: 8, padding: 3 },
   segmentItem: { alignItems: 'center', borderRadius: 999, flex: 1, minHeight: 38, justifyContent: 'center' },
   segmentLabel: { fontSize: 13, fontWeight: '600' },
+  accountName: { fontSize: 15, fontWeight: '600', paddingHorizontal: 8, paddingVertical: 10 },
   about: { fontSize: 13, lineHeight: 20, paddingHorizontal: 8, paddingVertical: 4 },
 });

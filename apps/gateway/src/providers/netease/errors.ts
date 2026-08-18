@@ -2,6 +2,7 @@ export type NeteaseProviderErrorCode =
   | 'UPSTREAM_TIMEOUT'
   | 'UPSTREAM_UNAVAILABLE'
   | 'NOT_FOUND'
+  | 'AUTH_REQUIRED'
   | 'TRACK_UNAVAILABLE';
 
 export class NeteaseProviderError extends Error {
