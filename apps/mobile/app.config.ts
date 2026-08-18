@@ -10,6 +10,7 @@ const config: ExpoConfig = {
   userInterfaceStyle: 'automatic',
   scheme: 'siplayer',
   plugins: [
+    'expo-dev-client',
     'expo-router',
     [
       'expo-audio',
