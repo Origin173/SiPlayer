@@ -9,6 +9,10 @@ export interface NeteaseApiClientOptions {
 
 type QueryValue = string | number | boolean;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 export class NeteaseApiClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -27,6 +31,7 @@ export class NeteaseApiClient {
     query: Record<string, QueryValue>,
     parse: (payload: unknown) => T,
     cookieOverride?: string,
+    acceptedCodes: number[] = [200],
   ): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`);
     for (const [key, value] of Object.entries(query)) {
@@ -48,6 +53,9 @@ export class NeteaseApiClient {
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         throw new NeteaseProviderError('UPSTREAM_UNAVAILABLE', 'Music service is temporarily unavailable.', true, response.status);
+      }
+      if (isRecord(payload) && typeof payload.code === 'number' && !acceptedCodes.includes(payload.code)) {
+        throw new NeteaseProviderError('UPSTREAM_UNAVAILABLE', 'Music service rejected the request.', true, response.status);
       }
 
       try {

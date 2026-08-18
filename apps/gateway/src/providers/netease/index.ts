@@ -154,6 +154,8 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
       neteaseEndpoints.qrCheck,
       { key: upstreamKey, timestamp: Date.now() },
       (payload) => RawQrCheckResponseSchema.parse(payload),
+      undefined,
+      [800, 801, 802, 803],
     );
     switch (raw.code) {
       case 801:
