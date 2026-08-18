@@ -1,4 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import type { UserProfile } from '@siplayer/contracts';
 
 export interface SessionPrincipal {
@@ -54,17 +56,57 @@ export class SessionStore {
   private readonly sessions = new Map<string, StoredSession>();
   private readonly key: Buffer;
   private readonly ttlMs: number;
+  private readonly persistencePath?: string;
 
-  constructor(secret: string, ttlMs: number) {
+  constructor(secret: string, ttlMs: number, persistencePath?: string) {
     this.key = encryptionKey(secret);
     this.ttlMs = ttlMs;
+    this.persistencePath = persistencePath;
+    this.load();
   }
 
-  private pruneExpired(): void {
-    const now = Date.now();
-    for (const [tokenHash, session] of this.sessions) {
-      if (session.expiresAtMs <= now) this.sessions.delete(tokenHash);
+  private load(): void {
+    if (!this.persistencePath) return;
+    try {
+      const parsed: unknown = JSON.parse(readFileSync(this.persistencePath, 'utf8'));
+      if (!Array.isArray(parsed)) return;
+      for (const item of parsed) {
+        if (!item || typeof item !== 'object') continue;
+        const value = item as Partial<StoredSession> & { tokenHash?: unknown };
+        if (typeof value.tokenHash !== 'string' || typeof value.encryptedCookie !== 'string' || typeof value.expiresAtMs !== 'number' || !value.user) continue;
+        this.sessions.set(value.tokenHash, {
+          user: value.user,
+          encryptedCookie: value.encryptedCookie,
+          expiresAtMs: value.expiresAtMs,
+        });
+      }
+      this.pruneExpired(false);
+    } catch {
+      // A missing or corrupt session file must not prevent the gateway from booting.
     }
+  }
+
+  private persist(): void {
+    if (!this.persistencePath) return;
+    try {
+      mkdirSync(dirname(this.persistencePath), { recursive: true });
+      const entries = [...this.sessions.entries()].map(([tokenHash, session]) => ({ tokenHash, ...session }));
+      writeFileSync(this.persistencePath, JSON.stringify(entries), { encoding: 'utf8', mode: 0o600 });
+    } catch {
+      // Session persistence is best effort; the in-memory store remains authoritative for this process.
+    }
+  }
+
+  private pruneExpired(shouldPersist = true): void {
+    const now = Date.now();
+    let changed = false;
+    for (const [tokenHash, session] of this.sessions) {
+      if (session.expiresAtMs <= now) {
+        this.sessions.delete(tokenHash);
+        changed = true;
+      }
+    }
+    if (changed && shouldPersist) this.persist();
   }
 
   create(user: UserProfile, cookie: string): { token: string; expiresAt: string } {
@@ -76,6 +118,7 @@ export class SessionStore {
       encryptedCookie: encryptCookie(cookie, this.key),
       expiresAtMs,
     });
+    this.persist();
     return { token, expiresAt: new Date(expiresAtMs).toISOString() };
   }
 
@@ -86,11 +129,13 @@ export class SessionStore {
     if (!stored) return null;
     if (stored.expiresAtMs <= Date.now()) {
       this.sessions.delete(tokenHash);
+      this.persist();
       return null;
     }
     const cookie = decryptCookie(stored.encryptedCookie, this.key);
     if (!cookie) {
       this.sessions.delete(tokenHash);
+      this.persist();
       return null;
     }
     return {
@@ -102,6 +147,7 @@ export class SessionStore {
 
   revoke(token: string): void {
     this.sessions.delete(hashToken(token));
+    this.persist();
   }
 
   size(): number {

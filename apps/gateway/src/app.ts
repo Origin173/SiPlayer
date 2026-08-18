@@ -97,7 +97,7 @@ export function buildApp(
   registerContentRoutes(app, { provider });
   registerAuthRoutes(app, {
     provider: options.authProvider ?? (provider as unknown as AuthProvider),
-    sessions: new SessionStore(config.SESSION_ENCRYPTION_KEY, config.SESSION_TTL_MS),
+    sessions: new SessionStore(config.SESSION_ENCRYPTION_KEY, config.SESSION_TTL_MS, config.SESSION_STORE_PATH),
     challenges: new QrChallengeStore(),
   });
 

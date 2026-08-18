@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { QrChallengeStore, SessionStore } from './stores';
 
@@ -14,6 +17,22 @@ describe('session stores', () => {
 
     store.revoke(created.token);
     expect(store.get(created.token)).toBeNull();
+  });
+
+  it('restores encrypted sessions after a gateway restart', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'siplayer-session-'));
+    const path = join(directory, 'sessions.json');
+    try {
+      const first = new SessionStore('a-test-secret-that-is-long-enough', 60_000, path);
+      const created = first.create(user, 'MUSIC_U=upstream-secret');
+      const persisted = readFileSync(path, 'utf8');
+      const second = new SessionStore('a-test-secret-that-is-long-enough', 60_000, path);
+
+      expect(persisted).not.toContain('upstream-secret');
+      expect(second.get(created.token)).toMatchObject({ user, cookie: 'MUSIC_U=upstream-secret' });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('expires QR challenges without returning the upstream key to callers', () => {

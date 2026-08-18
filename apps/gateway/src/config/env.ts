@@ -8,6 +8,7 @@ const envSchema = z.object({
   NETEASE_API_BASE_URL: z.string().url().default('http://127.0.0.1:3000'),
   SESSION_ENCRYPTION_KEY: z.string().min(16).default('dev-only-session-encryption-key'),
   SESSION_TTL_MS: z.coerce.number().int().positive().default(30 * 24 * 60 * 60 * 1000),
+  SESSION_STORE_PATH: z.string().min(1).optional(),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(120),
 });
@@ -15,5 +16,9 @@ const envSchema = z.object({
 export type GatewayConfig = z.infer<typeof envSchema>;
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): GatewayConfig {
-  return envSchema.parse(source);
+  const config = envSchema.parse(source);
+  return {
+    ...config,
+    SESSION_STORE_PATH: config.SESSION_STORE_PATH ?? (config.NODE_ENV === 'test' ? undefined : 'D:\\tmp\\siplayer\\gateway-sessions.json'),
+  };
 }

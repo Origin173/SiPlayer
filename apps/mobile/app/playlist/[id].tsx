@@ -55,6 +55,7 @@ export default function PlaylistDetailScreen() {
         <View style={styles.heroCopy}>
           <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{playlist.name}</Text>
           <Text style={[styles.meta, { color: theme.colors.textSecondary }]}>{playlist.trackCount ?? playlist.tracks.length} 首歌曲</Text>
+          {playlist.creator?.name ? <Text style={[styles.meta, { color: theme.colors.textSecondary }]}>创建者：{playlist.creator.name}</Text> : null}
           {playlist.description ? <Text style={[styles.description, { color: theme.colors.textSecondary }]}>{playlist.description}</Text> : null}
         </View>
       </View>
