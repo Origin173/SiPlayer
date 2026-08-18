@@ -18,6 +18,14 @@ describe('gateway foundation routes', () => {
     expect(body.requestId).toMatch(/^req_/);
   });
 
+  it('supports browser preflight for the web client', async () => {
+    const response = await app.inject({ method: 'OPTIONS', url: '/v1/search' });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe('*');
+    expect(response.headers['access-control-allow-headers']).toContain('Authorization');
+  });
+
   it('returns readiness without exposing upstream internals', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/ready' });
     const body = response.json<{ data: { status: string; upstream: string } }>();

@@ -43,6 +43,14 @@ export function buildApp(
     genReqId: () => `req_${randomUUID()}`,
   });
 
+  app.addHook('onRequest', async (request, reply) => {
+    reply
+      .header('Access-Control-Allow-Origin', '*')
+      .header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+      .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    if (request.method === 'OPTIONS') return reply.status(204).send();
+  });
+
   const rateBuckets = new Map<string, { startedAt: number; count: number }>();
   app.addHook('onRequest', async (request, reply) => {
     const path = request.url.split('?')[0];
