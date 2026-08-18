@@ -7,10 +7,11 @@ import { Artwork } from './Artwork';
 interface SongRowProps {
   track: Track;
   onPress?: () => void;
+  onRemove?: () => void;
   isCurrent?: boolean;
 }
 
-export function SongRow({ track, onPress, isCurrent = false }: SongRowProps) {
+export function SongRow({ track, onPress, onRemove, isCurrent = false }: SongRowProps) {
   const { theme } = useTheme();
   const disabled = !track.playable;
 
@@ -37,7 +38,11 @@ export function SongRow({ track, onPress, isCurrent = false }: SongRowProps) {
       </View>
       <View style={styles.trailing}>
         {isCurrent ? <Ionicons color={theme.colors.primary} name="volume-high-outline" size={20} /> : null}
-        <Ionicons color={theme.colors.textTertiary} name="ellipsis-horizontal" size={22} />
+        {onRemove ? (
+          <Pressable accessibilityLabel={`从队列移除 ${track.name}`} accessibilityRole="button" hitSlop={8} onPress={onRemove}>
+            <Ionicons color={theme.colors.textTertiary} name="close-circle-outline" size={21} />
+          </Pressable>
+        ) : <Ionicons color={theme.colors.textTertiary} name="ellipsis-horizontal" size={22} />}
       </View>
     </Pressable>
   );

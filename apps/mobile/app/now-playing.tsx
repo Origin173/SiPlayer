@@ -6,7 +6,7 @@ import { useAuth } from '@/auth';
 import { useTrackLike } from '@/api/hooks';
 import { Artwork, SongRow } from '@/components/music';
 import { EmptyState, IconButton, Screen } from '@/components/ui';
-import { mockTracks } from '@/features/mockData';
+import { trackFromQueueItem } from '@/player/playbackTypes';
 import { usePlayer, usePlayerStore } from '@/player';
 import { useTheme } from '@/theme';
 import { formatTime } from '@/utils/formatTime';
@@ -21,6 +21,7 @@ export default function NowPlayingScreen() {
   const queue = usePlayerStore((state) => state.queue);
   const currentIndex = usePlayerStore((state) => state.currentIndex);
   const playbackState = usePlayerStore((state) => state.playbackState);
+  const playbackMode = usePlayerStore((state) => state.playbackMode);
   const positionMs = usePlayerStore((state) => state.positionMs);
   const durationMs = usePlayerStore((state) => state.durationMs);
   const current = queue[currentIndex];
@@ -29,6 +30,13 @@ export default function NowPlayingScreen() {
   const artworkSize = Math.min(Math.max(width - 64, 240), 360);
   const isPlaying = playbackState === 'playing';
   const progress = durationMs > 0 ? Math.min(positionMs / durationMs, 1) : 0;
+  const modeIcon = playbackMode === 'shuffle' ? 'shuffle-outline' : 'repeat-outline';
+  const modeLabel = playbackMode === 'sequential' ? '顺序播放' : playbackMode === 'repeat_all' ? '循环播放' : playbackMode === 'repeat_one' ? '单曲循环' : '随机播放';
+  const cycleMode = () => {
+    const modes = ['sequential', 'repeat_all', 'repeat_one', 'shuffle'] as const;
+    const nextMode = modes[(modes.indexOf(playbackMode) + 1) % modes.length];
+    if (nextMode) player.setMode(nextMode);
+  };
 
   if (!current) {
     return (
@@ -44,7 +52,7 @@ export default function NowPlayingScreen() {
       <View style={styles.header}>
         <IconButton accessibilityLabel="关闭正在播放" name="chevron-down" onPress={() => router.back()} />
         <Text style={[styles.headerTitle, { color: theme.colors.textSecondary }]}>正在播放</Text>
-        <IconButton accessibilityLabel="更多播放选项" name="ellipsis-horizontal" onPress={() => undefined} />
+        <View style={styles.headerSpace} />
       </View>
 
       <View style={styles.artworkWrap}>
@@ -84,7 +92,7 @@ export default function NowPlayingScreen() {
       </View>
 
       <View style={styles.secondaryControls}>
-        <IconButton accessibilityLabel="切换播放模式" name="repeat-outline" onPress={() => player.setMode('repeat_all')} />
+        <IconButton accessibilityLabel={`切换播放模式，当前${modeLabel}`} name={modeIcon} onPress={cycleMode} />
         <IconButton
           accessibilityLabel={liked ? '取消喜欢' : '喜欢这首歌'}
           color={liked ? theme.colors.primary : undefined}
@@ -101,18 +109,25 @@ export default function NowPlayingScreen() {
           }}
         />
         <IconButton accessibilityLabel="查看歌词" name="text-outline" onPress={() => router.push('/lyrics')} />
-        <IconButton accessibilityLabel="打开播放队列" name="list-outline" onPress={() => undefined} />
       </View>
 
       <View style={[styles.queueHeader, { borderTopColor: theme.colors.divider }]}>
         <Text style={[styles.queueTitle, { color: theme.colors.textPrimary }]}>播放队列</Text>
-        <Text style={[styles.queueCount, { color: theme.colors.textSecondary }]}>{queue.length} 首</Text>
+        <View style={styles.queueActions}>
+          <Text style={[styles.queueCount, { color: theme.colors.textSecondary }]}>{queue.length} 首</Text>
+          {currentIndex < queue.length - 1 ? <Pressable accessibilityLabel="清空后续歌曲" accessibilityRole="button" onPress={player.clearNext}><Text style={[styles.clearNext, { color: theme.colors.primary }]}>清空后续</Text></Pressable> : null}
+        </View>
       </View>
       <ScrollView scrollEnabled={false}>
-        {queue.map((item, index) => {
-          const track = mockTracks.find((candidate) => candidate.id === item.trackId);
-          return track ? <SongRow key={`${item.trackId}-${index}`} isCurrent={index === currentIndex} onPress={() => player.setQueue(queue, index)} track={track} /> : null;
-        })}
+        {queue.map((item, index) => (
+          <SongRow
+            key={`${item.trackId}-${index}`}
+            isCurrent={index === currentIndex}
+            onPress={() => player.setQueue(queue, index)}
+            onRemove={index === currentIndex ? undefined : () => player.removeFromQueue(index)}
+            track={trackFromQueueItem(item)}
+          />
+        ))}
       </ScrollView>
       <Text style={[styles.sourceNote, { color: theme.colors.textTertiary }]}>播放地址由 Gateway 临时解析，不会写入队列</Text>
     </Screen>
@@ -123,6 +138,7 @@ const styles = StyleSheet.create({
   content: { alignItems: 'stretch' },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   headerTitle: { fontSize: 13, fontWeight: '600' },
+  headerSpace: { height: 44, width: 44 },
   artworkWrap: { alignItems: 'center', marginVertical: 24 },
   trackCopy: { alignItems: 'center' },
   trackTitle: { fontSize: 24, fontWeight: '700', lineHeight: 30, textAlign: 'center' },
@@ -138,5 +154,7 @@ const styles = StyleSheet.create({
   queueHeader: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 24, paddingTop: 20 },
   queueTitle: { fontSize: 18, fontWeight: '700' },
   queueCount: { fontSize: 12 },
+  queueActions: { alignItems: 'center', flexDirection: 'row', gap: 12 },
+  clearNext: { fontSize: 12, fontWeight: '600' },
   sourceNote: { fontSize: 11, marginTop: 16, textAlign: 'center' },
 });

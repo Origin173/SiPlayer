@@ -39,3 +39,16 @@ export function queueItemFromTrack(track: Track): QueueItem {
     durationMs: track.durationMs,
   };
 }
+
+export function trackFromQueueItem(item: QueueItem): Track {
+  return item.track ?? {
+    id: item.trackId,
+    name: item.title,
+    artists: [{ id: 'unknown', name: item.artistText }],
+    artistText: item.artistText,
+    album: item.albumTitle ? { id: 'unknown', name: item.albumTitle, artists: [] } : null,
+    artworkUrl: item.artworkUrl ?? null,
+    durationMs: item.durationMs ?? null,
+    playable: true,
+  };
+}

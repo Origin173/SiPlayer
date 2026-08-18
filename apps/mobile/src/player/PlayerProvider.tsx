@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, typ
 import { ApiError } from '@/api/client';
 import { recordLocalTrack } from '@/features/localHistory';
 import { resolveStream } from './playbackResolver';
+import { nextQueueIndex } from './playbackModes';
 import type { PlayContext, PlaybackMode, QueueItem } from './playbackTypes';
 import { usePlayerStore } from './playerStore';
 
@@ -18,6 +19,7 @@ export interface PlayerController {
   addNext: (item: QueueItem) => void;
   addToQueue: (item: QueueItem) => void;
   removeFromQueue: (index: number) => void;
+  clearNext: () => void;
   clearQueue: () => void;
   setMode: (mode: PlaybackMode) => void;
 }
@@ -137,24 +139,10 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const next = useCallback(() => {
     const state = usePlayerStore.getState();
     if (state.queue.length === 0) return;
-    if (state.playbackMode === 'repeat_one') {
-      goToIndex(state.currentIndex);
-      return;
-    }
-    if (state.playbackMode === 'shuffle' && state.queue.length > 1) {
-      const candidates = state.queue.map((_, index) => index).filter((index) => index !== state.currentIndex);
-      const randomIndex = candidates[Math.floor(Math.random() * candidates.length)];
-      if (randomIndex != null) goToIndex(randomIndex);
-      return;
-    }
-    const nextIndex = state.currentIndex + 1;
-    if (nextIndex >= state.queue.length) {
-      if (state.playbackMode === 'repeat_all') {
-        goToIndex(0);
-      } else {
-        audioPlayer.pause();
-        setPlaybackState('ended');
-      }
+    const nextIndex = nextQueueIndex(state.playbackMode, state.currentIndex, state.queue.length);
+    if (nextIndex == null) {
+      audioPlayer.pause();
+      setPlaybackState('ended');
       return;
     }
     goToIndex(nextIndex);
@@ -216,6 +204,15 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     [audioPlayer, clear, resolveAndPlay, setPlaybackState, setQueue],
   );
 
+  const clearNext = useCallback(() => {
+    const state = usePlayerStore.getState();
+    if (state.currentIndex < 0 || state.currentIndex >= state.queue.length - 1) return;
+    const nextQueue = state.queue.slice(0, state.currentIndex + 1);
+    setQueue(nextQueue, state.currentIndex);
+    setPosition(state.positionMs, state.durationMs);
+    setPlaybackState(state.playbackState);
+  }, [setPlaybackState, setPosition, setQueue]);
+
   const clearQueue = useCallback(() => {
     generationRef.current += 1;
     resolvedTrackIdRef.current = null;
@@ -275,10 +272,11 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       addNext,
       addToQueue,
       removeFromQueue,
+      clearNext,
       clearQueue,
       setMode: setPlaybackMode,
     }),
-    [addNext, addToQueue, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, seekTo, setPlaybackMode, setPlayerQueue, toggle],
+    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, seekTo, setPlaybackMode, setPlayerQueue, toggle],
   );
 
   return <PlayerContext.Provider value={controller}>{children}</PlayerContext.Provider>;
