@@ -1,15 +1,41 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { HealthDataSchema, type AudioQuality } from '@siplayer/contracts';
 import type { ReactNode } from 'react';
 import { useAuth } from '@/auth';
+import { apiClient } from '@/api/client';
 import { Button, IconButton, Screen } from '@/components/ui';
+import { usePlayer, usePlayerStore } from '@/player';
 import { useTheme } from '@/theme';
+
+const qualityOptions: Array<{ value: AudioQuality; label: string }> = [
+  { value: 'auto', label: '自动' },
+  { value: 'standard', label: '标准' },
+  { value: 'high', label: '高' },
+  { value: 'lossless', label: '无损' },
+];
+const modeOptions = [
+  { value: 'sequential' as const, label: '顺序' },
+  { value: 'repeat_all' as const, label: '循环' },
+  { value: 'repeat_one' as const, label: '单曲' },
+  { value: 'shuffle' as const, label: '随机' },
+];
 
 export default function SettingsScreen() {
   const { theme, preference, setPreference } = useTheme();
   const router = useRouter();
   const auth = useAuth();
+  const player = usePlayer();
+  const queryClient = useQueryClient();
+  const quality = usePlayerStore((state) => state.quality);
+  const playbackMode = usePlayerStore((state) => state.playbackMode);
+  const gatewayHealth = useQuery({
+    queryKey: ['gateway', 'health'],
+    queryFn: async () => (await apiClient.request('/v1/health', undefined, HealthDataSchema)).data,
+    staleTime: 30_000,
+  });
 
   return (
     <Screen>
@@ -20,8 +46,22 @@ export default function SettingsScreen() {
       </View>
 
       <SettingsSection title="播放">
-        <SettingsRow icon="musical-notes-outline" title="音质" subtitle="自动选择可用音质" />
-        <SettingsRow icon="play-forward-outline" title="播放行为" subtitle="顺序播放" />
+        <SettingsRow icon="musical-notes-outline" title="音质" subtitle={qualityOptions.find((option) => option.value === quality)?.label ?? '自动'} />
+        <View style={[styles.segment, { backgroundColor: theme.colors.surfaceMuted }]}>
+          {qualityOptions.map((option) => (
+            <Pressable key={option.value} accessibilityLabel={`${option.label}音质`} accessibilityRole="button" onPress={() => player.setQuality(option.value)} style={[styles.segmentItem, quality === option.value && { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.segmentLabel, { color: quality === option.value ? theme.colors.textPrimary : theme.colors.textSecondary }]}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <SettingsRow icon="play-forward-outline" title="播放行为" subtitle={modeOptions.find((option) => option.value === playbackMode)?.label ?? '顺序'} />
+        <View style={[styles.segment, { backgroundColor: theme.colors.surfaceMuted }]}>
+          {modeOptions.map((option) => (
+            <Pressable key={option.value} accessibilityLabel={`${option.label}播放`} accessibilityRole="button" onPress={() => player.setMode(option.value)} style={[styles.segmentItem, playbackMode === option.value && { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.segmentLabel, { color: playbackMode === option.value ? theme.colors.textPrimary : theme.colors.textSecondary }]}>{option.label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </SettingsSection>
       <SettingsSection title="外观">
         <SettingsRow icon="contrast-outline" title="主题" subtitle={preference === 'system' ? '跟随系统' : preference === 'dark' ? '深色' : '浅色'} />
@@ -46,6 +86,13 @@ export default function SettingsScreen() {
             <Button onPress={() => void auth.logout()} variant="secondary">退出登录</Button>
           </>
         ) : <Button onPress={() => router.push('/login')} variant="secondary">登录网易云音乐</Button>}
+      </SettingsSection>
+      <SettingsSection title="服务">
+        <SettingsRow icon="cloud-outline" title="Gateway 状态" subtitle={gatewayHealth.isPending ? '检查中…' : gatewayHealth.isError ? '暂时不可用' : gatewayHealth.data.status === 'ok' ? '在线' : '未知'} />
+        <Button onPress={() => void gatewayHealth.refetch()} variant="secondary">重新检查</Button>
+      </SettingsSection>
+      <SettingsSection title="数据">
+        <Button onPress={() => queryClient.clear()} variant="secondary">清理本机缓存</Button>
       </SettingsSection>
       <SettingsSection title="关于">
         <Text style={[styles.about, { color: theme.colors.textSecondary }]}>SiPlayer 0.1.0</Text>

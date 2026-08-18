@@ -1,4 +1,5 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import type { AudioQuality } from '@siplayer/contracts';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
 import { ApiError } from '@/api/client';
 import { recordLocalTrack } from '@/features/localHistory';
@@ -22,6 +23,7 @@ export interface PlayerController {
   clearNext: () => void;
   clearQueue: () => void;
   setMode: (mode: PlaybackMode) => void;
+  setQuality: (quality: AudioQuality) => void;
 }
 
 const PlayerContext = createContext<PlayerController | null>(null);
@@ -32,6 +34,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const setQueue = usePlayerStore((state) => state.setQueue);
   const setPlaybackState = usePlayerStore((state) => state.setPlaybackState);
   const setPlaybackMode = usePlayerStore((state) => state.setPlaybackMode);
+  const setPlaybackQuality = usePlayerStore((state) => state.setQuality);
   const setPosition = usePlayerStore((state) => state.setPosition);
   const setCurrentIndex = usePlayerStore((state) => state.setCurrentIndex);
   const clear = usePlayerStore((state) => state.clear);
@@ -57,7 +60,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       setPlaybackState('resolving');
 
       try {
-        const stream = await resolveStream(item.trackId);
+        const stream = await resolveStream(item.trackId, usePlayerStore.getState().quality);
         if (generation !== generationRef.current) return;
         audioPlayer.replace({ uri: stream.url, name: item.title });
         audioPlayer.setActiveForLockScreen(true, {
@@ -224,6 +227,16 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     audioPlayer.clearLockScreenControls();
   }, [audioPlayer, clear]);
 
+  const setQuality = useCallback(
+    (quality: AudioQuality) => {
+      setPlaybackQuality(quality);
+      const state = usePlayerStore.getState();
+      const item = state.queue[state.currentIndex];
+      if (item) void resolveAndPlay(item);
+    },
+    [resolveAndPlay, setPlaybackQuality],
+  );
+
   const seekTo = useCallback(
     (positionMs: number) => {
       const nextPosition = Math.max(positionMs, 0);
@@ -278,8 +291,9 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       clearNext,
       clearQueue,
       setMode: setPlaybackMode,
+      setQuality,
     }),
-    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, seekTo, setPlaybackMode, setPlayerQueue, toggle],
+    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, seekTo, setPlaybackMode, setPlayerQueue, setQuality, toggle],
   );
 
   return <PlayerContext.Provider value={controller}>{children}</PlayerContext.Provider>;

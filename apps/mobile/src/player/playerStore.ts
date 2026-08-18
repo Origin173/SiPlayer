@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { AudioQuality } from '@siplayer/contracts';
 import type { QueueItem, PlaybackMode, PlaybackState } from './playbackTypes';
 
 interface PlayerStore {
@@ -6,11 +7,13 @@ interface PlayerStore {
   currentIndex: number;
   playbackState: PlaybackState;
   playbackMode: PlaybackMode;
+  quality: AudioQuality;
   positionMs: number;
   durationMs: number;
   setQueue: (queue: QueueItem[], startIndex?: number) => void;
   setPlaybackState: (playbackState: PlaybackState) => void;
   setPlaybackMode: (playbackMode: PlaybackMode) => void;
+  setQuality: (quality: AudioQuality) => void;
   setPosition: (positionMs: number, durationMs?: number) => void;
   setCurrentIndex: (currentIndex: number) => void;
   clear: () => void;
@@ -21,6 +24,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   currentIndex: -1,
   playbackState: 'idle',
   playbackMode: 'sequential',
+  quality: 'auto',
   positionMs: 0,
   durationMs: 0,
   setQueue: (queue, startIndex = 0) =>
@@ -33,6 +37,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
     }),
   setPlaybackState: (playbackState) => set({ playbackState }),
   setPlaybackMode: (playbackMode) => set({ playbackMode }),
+  setQuality: (quality) => set({ quality }),
   setPosition: (positionMs, durationMs) => set((state) => ({
     positionMs,
     durationMs: durationMs ?? state.durationMs,
