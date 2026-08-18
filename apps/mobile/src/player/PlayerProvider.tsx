@@ -166,18 +166,20 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       const nextQueue = [...state.queue];
       nextQueue.splice(Math.max(state.currentIndex + 1, 0), 0, item);
       setQueue(nextQueue, state.currentIndex < 0 ? 0 : state.currentIndex);
+      setPosition(state.positionMs, state.durationMs);
       setPlaybackState(state.playbackState);
     },
-    [setPlaybackState, setQueue],
+    [setPlaybackState, setPosition, setQueue],
   );
 
   const addToQueue = useCallback(
     (item: QueueItem) => {
       const state = usePlayerStore.getState();
       setQueue([...state.queue, item], state.currentIndex < 0 ? 0 : state.currentIndex);
+      setPosition(state.positionMs, state.durationMs);
       setPlaybackState(state.playbackState);
     },
-    [setPlaybackState, setQueue],
+    [setPlaybackState, setPosition, setQueue],
   );
 
   const removeFromQueue = useCallback(
@@ -198,10 +200,11 @@ export function PlayerProvider({ children }: PropsWithChildren) {
         const nextItem = nextQueue[Math.max(nextIndex, 0)];
         if (nextItem) void resolveAndPlay(nextItem);
       } else {
+        setPosition(state.positionMs, state.durationMs);
         setPlaybackState(state.playbackState);
       }
     },
-    [audioPlayer, clear, resolveAndPlay, setPlaybackState, setQueue],
+    [audioPlayer, clear, resolveAndPlay, setPlaybackState, setPosition, setQueue],
   );
 
   const clearNext = useCallback(() => {
