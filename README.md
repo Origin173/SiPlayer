@@ -32,7 +32,7 @@ pnpm dev:mobile
 
 The Gateway defaults to `http://127.0.0.1:8787`; the fixed upstream service is configured separately through `NETEASE_API_BASE_URL`. In development, encrypted server sessions persist at `D:\\tmp\\siplayer\\gateway-sessions.json`; set `SESSION_STORE_PATH` to a durable private volume in production.
 
-For background audio and lock-screen controls, use an EAS Development Build. Expo Go is only for early JS/UI validation.
+For background audio and lock-screen controls, use an EAS Development Build (`eas build --profile development --platform android|ios`). Expo Go is only for early JS/UI validation. Set `EXPO_PUBLIC_GATEWAY_URL` to a device-reachable HTTPS Gateway URL for a physical-device build; the local default is for desktop/emulator development.
 
 ## Local cache policy
 
