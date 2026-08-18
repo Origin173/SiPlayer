@@ -41,6 +41,11 @@ export default function PlaylistDetailScreen() {
   const playlist = playlistQuery.data;
   if (!playlist) return <Screen><EmptyState title="歌单不存在" message="找不到这个歌单。" /></Screen>;
   const playableTracks = playlist.tracks.filter((track) => track.playable);
+  const shuffle = () => {
+    const shuffled = [...playableTracks].sort(() => Math.random() - 0.5);
+    player.setMode('shuffle');
+    player.setQueue(shuffled.map(queueItemFromTrack), 0);
+  };
 
   return (
     <Screen>
@@ -53,7 +58,10 @@ export default function PlaylistDetailScreen() {
           {playlist.description ? <Text style={[styles.description, { color: theme.colors.textSecondary }]}>{playlist.description}</Text> : null}
         </View>
       </View>
-      <Button disabled={playableTracks.length === 0} onPress={() => player.setQueue(playableTracks.map(queueItemFromTrack), 0)}>播放全部</Button>
+      <View style={styles.actions}>
+        <View style={styles.primaryAction}><Button disabled={playableTracks.length === 0} onPress={() => player.setQueue(playableTracks.map(queueItemFromTrack), 0)}>播放全部</Button></View>
+        <IconButton accessibilityLabel="随机播放歌单" disabled={playableTracks.length === 0} name="shuffle-outline" onPress={shuffle} />
+      </View>
       <View style={styles.list}>
         {playlist.tracks.length > 0 ? playlist.tracks.map((track, index) => {
           const playableIndex = playableTracks.findIndex((item) => item.id === track.id);
@@ -73,5 +81,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: '700', lineHeight: 30, textAlign: 'center' },
   meta: { fontSize: 13, marginTop: 6 },
   description: { fontSize: 13, lineHeight: 19, marginTop: 8, textAlign: 'center' },
+  actions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  primaryAction: { flex: 1 },
   list: { marginTop: 20 },
 });
