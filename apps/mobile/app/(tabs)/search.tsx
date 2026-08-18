@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Screen, SearchField } from '@/components/ui';
+import { useTrackSearch } from '@/api/hooks';
+import { ErrorState, Screen, SearchField, Skeleton } from '@/components/ui';
 import { SongRow } from '@/components/music';
-import { mockTracks } from '@/features/mockData';
 import { queueItemFromTrack } from '@/player/playbackTypes';
 import { usePlayer } from '@/player';
 import { useTheme } from '@/theme';
@@ -12,10 +12,8 @@ export default function SearchScreen() {
   const player = usePlayer();
   const [keyword, setKeyword] = useState('');
   const [submittedKeyword, setSubmittedKeyword] = useState('');
-  const results = useMemo(
-    () => mockTracks.filter((track) => `${track.name} ${track.artistText}`.toLowerCase().includes(submittedKeyword.toLowerCase())),
-    [submittedKeyword],
-  );
+  const search = useTrackSearch(submittedKeyword);
+  const results = search.data?.items ?? [];
 
   const submit = () => setSubmittedKeyword(keyword.trim());
 
@@ -36,15 +34,28 @@ export default function SearchScreen() {
         <View style={styles.results}>
           <View style={styles.resultHeader}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>歌曲</Text>
-            <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>{results.length} 个结果</Text>
+            {search.isFetching && search.data ? <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>更新中</Text> : null}
+            {!search.isFetching && search.data ? <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>{results.length} 个结果</Text> : null}
           </View>
-          {results.length > 0 ? results.map((track) => (
-            <SongRow
-              key={track.id}
-              onPress={() => player.playTrack(queueItemFromTrack(track), { queue: results.map(queueItemFromTrack), startIndex: results.indexOf(track) })}
-              track={track}
-            />
-          )) : <Text style={[styles.historyText, { color: theme.colors.textSecondary }]}>没有找到匹配的歌曲</Text>}
+          {search.isPending ? (
+            <View style={styles.loading}>
+              <Skeleton height={56} />
+              <Skeleton height={56} />
+              <Skeleton height={56} />
+            </View>
+          ) : search.isError ? (
+            <ErrorState onRetry={() => void search.refetch()} />
+          ) : results.length > 0 ? (
+            results.map((track, index) => (
+              <SongRow
+                key={track.id}
+                onPress={() => player.playTrack(queueItemFromTrack(track), { queue: results.map(queueItemFromTrack), startIndex: index })}
+                track={track}
+              />
+            ))
+          ) : (
+            <Text style={[styles.historyText, { color: theme.colors.textSecondary }]}>没有找到匹配的歌曲</Text>
+          )}
         </View>
       )}
     </Screen>
@@ -61,4 +72,5 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '700' },
   resultCount: { fontSize: 12 },
   historyText: { fontSize: 14, lineHeight: 20, marginTop: 12 },
+  loading: { gap: 12 },
 });

@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
-import { z } from 'zod';
-import type { ApiErrorCode, ErrorEnvelope } from '@siplayer/contracts';
+import type { z } from 'zod';
+import { ErrorEnvelopeSchema, SuccessEnvelopeSchema, type ApiErrorCode } from '@siplayer/contracts';
 
 function resolveGatewayUrl(): string {
   const configuredUrl = Constants.expoConfig?.extra?.gatewayUrl;
@@ -110,17 +110,5 @@ export class ApiClient {
     return { data, requestId: envelope.data.requestId };
   }
 }
-
-const ErrorEnvelopeSchema = z.custom<ErrorEnvelope>((value) => {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.requestId === 'string' && 'error' in candidate;
-});
-
-const SuccessEnvelopeSchema = z.custom<{ data: unknown; requestId: string }>((value) => {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Record<string, unknown>;
-  return typeof candidate.requestId === 'string' && 'data' in candidate;
-});
 
 export const apiClient = new ApiClient();
