@@ -210,13 +210,13 @@ jobs:
         shell: bash
         run: |
           title="SiPlayer ${RELEASE_TAG}"
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --title "$title" --notes-file release-notes.md
-            gh release upload "$RELEASE_TAG" release-artifacts/* --clobber
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$title" --notes-file release-notes.md
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" release-artifacts/* --clobber
           elif [[ "$RELEASE_TAG" == *-* ]]; then
-            gh release create "$RELEASE_TAG" --verify-tag --title "$title" --notes-file release-notes.md --prerelease release-artifacts/*
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$title" --notes-file release-notes.md --prerelease release-artifacts/*
           else
-            gh release create "$RELEASE_TAG" --verify-tag --title "$title" --notes-file release-notes.md release-artifacts/*
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$title" --notes-file release-notes.md release-artifacts/*
           fi
 
   update-changelog:
