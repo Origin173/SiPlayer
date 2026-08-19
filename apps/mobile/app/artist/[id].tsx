@@ -1,4 +1,5 @@
 import { FlashList } from '@shopify/flash-list';
+import type { AlbumSummary, Track } from '@siplayer/contracts';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { useArtistAlbums, useArtistDetail, useArtistTopTracks } from '@/api/hooks';
@@ -7,6 +8,11 @@ import { Button, EmptyState, ErrorState, IconButton, Screen, Skeleton } from '@/
 import { queueItemFromTrack } from '@/player/playbackTypes';
 import { usePlayer } from '@/player';
 import { useTheme } from '@/theme';
+
+type ArtistListItem =
+  | { id: string; kind: 'album'; album: AlbumSummary }
+  | { id: 'albums-more'; kind: 'albums-more' }
+  | { id: string; kind: 'track'; track: Track };
 
 export default function ArtistDetailScreen() {
   const { theme } = useTheme();
@@ -51,15 +57,21 @@ export default function ArtistDetailScreen() {
   if (!artist) return <Screen><EmptyState title="歌手不存在" message="找不到这个歌手。" /></Screen>;
   const playableTracks = tracks.filter((track) => track.playable);
   const queueItems = playableTracks.map(queueItemFromTrack);
+  const listItems: ArtistListItem[] = [
+    ...albums.map((album, index) => ({ id: `album-${album.id}-${index}`, kind: 'album' as const, album })),
+    ...(albumsQuery.hasNextPage ? [{ id: 'albums-more' as const, kind: 'albums-more' as const }] : []),
+    ...tracks.map((track, index) => ({ id: `track-${track.id}-${index}`, kind: 'track' as const, track })),
+  ];
+  const trackStartIndex = albums.length + (albumsQuery.hasNextPage ? 1 : 0);
 
   return (
     <Screen contentContainerStyle={styles.screenContent} scroll={false}>
       <FlashList
         contentContainerStyle={styles.listContent}
-        data={tracks}
-        keyExtractor={(track, index) => `${track.id}-${index}`}
-        ListEmptyComponent={<EmptyState message="这个歌手暂时没有热门歌曲。" title="暂无歌曲" />}
-        ListFooterComponent={albumsQuery.hasNextPage ? <Button disabled={albumsQuery.isFetchingNextPage} onPress={() => void albumsQuery.fetchNextPage()} variant="secondary">{albumsQuery.isFetchingNextPage ? '加载中…' : '加载更多专辑'}</Button> : null}
+        data={listItems}
+        keyExtractor={(item) => item.id}
+        ListEmptyComponent={<EmptyState message="这个歌手暂时没有专辑或热门歌曲。" title="暂无内容" />}
+        ListFooterComponent={tracks.length === 0 && albums.length > 0 ? <EmptyState message="这个歌手暂时没有热门歌曲。" title="暂无热门歌曲" /> : null}
         ListHeaderComponent={(
           <>
             <IconButton accessibilityLabel="返回" name="chevron-back" onPress={() => router.back()} />
@@ -75,20 +87,30 @@ export default function ArtistDetailScreen() {
               <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>专辑</Text>
               <Text style={[styles.sectionMeta, { color: theme.colors.textSecondary }]}>{albums.length} 个结果</Text>
             </View>
-            {albums.length === 0 ? <Text style={[styles.emptyAlbums, { color: theme.colors.textSecondary }]}>暂无专辑</Text> : albums.map((album) => (
-              <CatalogRow key={album.id} item={album} onPress={() => router.push(`/album/${album.id}`)} type="album" />
-            ))}
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>热门歌曲</Text>
-              <Text style={[styles.sectionMeta, { color: theme.colors.textSecondary }]}>{tracks.length} 首</Text>
-            </View>
+            {albums.length === 0 ? <Text style={[styles.emptyAlbums, { color: theme.colors.textSecondary }]}>暂无专辑</Text> : null}
           </>
         )}
         renderItem={({ item }) => {
-          const playableIndex = playableTracks.findIndex((track) => track.id === item.id);
-          return <SongRow onPress={() => {
-            if (playableIndex >= 0) player.playTrack(queueItemFromTrack(item), { queue: queueItems, startIndex: playableIndex });
-          }} track={item} />;
+          if (item.kind === 'album') {
+            return <CatalogRow item={item.album} onPress={() => router.push(`/album/${item.album.id}`)} type="album" />;
+          }
+          if (item.kind === 'albums-more') {
+            return <Button disabled={albumsQuery.isFetchingNextPage} onPress={() => void albumsQuery.fetchNextPage()} variant="secondary">{albumsQuery.isFetchingNextPage ? '加载中…' : '加载更多专辑'}</Button>;
+          }
+          const playableIndex = playableTracks.findIndex((track) => track.id === item.track.id);
+          return (
+            <>
+              {item.id === listItems[trackStartIndex]?.id ? (
+                <View style={styles.sectionHeader}>
+                  <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>热门歌曲</Text>
+                  <Text style={[styles.sectionMeta, { color: theme.colors.textSecondary }]}>{tracks.length} 首</Text>
+                </View>
+              ) : null}
+              <SongRow onPress={() => {
+                if (playableIndex >= 0) player.playTrack(queueItemFromTrack(item.track), { queue: queueItems, startIndex: playableIndex });
+              }} track={item.track} />
+            </>
+          );
         }}
         showsVerticalScrollIndicator={false}
       />
