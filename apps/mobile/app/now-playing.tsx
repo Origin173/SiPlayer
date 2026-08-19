@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { useEffect, useState } from 'react';
+import { Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/auth';
 import { useTrackLike } from '@/api/hooks';
 import { Artwork, SongRow } from '@/components/music';
@@ -31,6 +31,31 @@ export default function NowPlayingScreen() {
   const artworkSize = Math.min(Math.max(width - 64, 240), 360);
   const isPlaying = playbackState === 'playing';
   const progress = durationMs > 0 ? Math.min(positionMs / durationMs, 1) : 0;
+  const [progressWidth, setProgressWidth] = useState(0);
+  const [draftProgress, setDraftProgress] = useState<number | null>(null);
+  const draftProgressRef = useRef<number | null>(null);
+  const displayedProgress = draftProgress ?? progress;
+  const displayedPositionMs = durationMs > 0 ? Math.round(displayedProgress * durationMs) : positionMs;
+  const setDraftFromLocation = useCallback((locationX: number) => {
+    if (progressWidth <= 0 || durationMs <= 0) return;
+    const next = Math.max(0, Math.min(locationX / progressWidth, 1));
+    draftProgressRef.current = next;
+    setDraftProgress(next);
+  }, [durationMs, progressWidth]);
+  const finishSeek = useCallback(() => {
+    const next = draftProgressRef.current;
+    draftProgressRef.current = null;
+    setDraftProgress(null);
+    if (next != null && durationMs > 0) player.seekTo(Math.round(next * durationMs));
+  }, [durationMs, player]);
+  const progressResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: (event) => setDraftFromLocation(event.nativeEvent.locationX),
+    onPanResponderMove: (event) => setDraftFromLocation(event.nativeEvent.locationX),
+    onPanResponderRelease: finishSeek,
+    onPanResponderTerminate: finishSeek,
+  }), [finishSeek, setDraftFromLocation]);
   const modeIcon = playbackMode === 'shuffle' ? 'shuffle-outline' : 'repeat-outline';
   const modeLabel = playbackMode === 'sequential' ? '顺序播放' : playbackMode === 'repeat_all' ? '循环播放' : playbackMode === 'repeat_one' ? '单曲循环' : '随机播放';
   const cycleMode = () => {
@@ -65,16 +90,19 @@ export default function NowPlayingScreen() {
       </View>
 
       <View style={styles.progressWrap}>
-        <Pressable
-          accessibilityLabel={`播放进度 ${formatTime(positionMs)} / ${formatTime(durationMs)}`}
+        <View
+          accessible
+          accessibilityLabel={`播放进度 ${formatTime(displayedPositionMs)} / ${formatTime(durationMs)}`}
           accessibilityRole="adjustable"
-          onPress={() => player.seekTo(durationMs > 0 ? (progress < 0.5 ? durationMs / 2 : 0) : 0)}
+          accessibilityValue={{ max: durationMs, min: 0, now: displayedPositionMs }}
+          onLayout={(event) => setProgressWidth(event.nativeEvent.layout.width)}
           style={[styles.progressHitArea, { backgroundColor: theme.colors.surfaceMuted }]}
+          {...progressResponder.panHandlers}
         >
-          <View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${progress * 100}%` }]} />
-        </Pressable>
+          <View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${displayedProgress * 100}%` }]} />
+        </View>
         <View style={styles.timeRow}>
-          <Text style={[styles.time, { color: theme.colors.textSecondary }]}>{formatTime(positionMs)}</Text>
+          <Text style={[styles.time, { color: theme.colors.textSecondary }]}>{formatTime(displayedPositionMs)}</Text>
           <Text style={[styles.time, { color: theme.colors.textSecondary }]}>{formatTime(durationMs)}</Text>
         </View>
       </View>
