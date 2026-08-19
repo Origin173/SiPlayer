@@ -13,4 +13,14 @@ describe('gateway config', () => {
   it('rejects an invalid upstream URL', () => {
     expect(() => loadConfig({ NETEASE_API_BASE_URL: 'not-a-url' })).toThrow();
   });
+
+  it('requires explicit secrets and origins in production', () => {
+    expect(() => loadConfig({ NODE_ENV: 'production' })).toThrow(/Production requires/);
+    expect(loadConfig({
+      NODE_ENV: 'production',
+      SESSION_ENCRYPTION_KEY: 'production-secret-that-is-long-enough',
+      ALLOWED_ORIGINS: 'https://player.example.com',
+      SESSION_STORE_PATH: '/var/lib/siplayer/sessions.json',
+    }).ALLOWED_ORIGINS).toBe('https://player.example.com');
+  });
 });

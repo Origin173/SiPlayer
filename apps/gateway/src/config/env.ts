@@ -7,6 +7,7 @@ const envSchema = z.object({
   API_VERSION: z.string().min(1).default('0.1.0'),
   NETEASE_API_BASE_URL: z.string().url().default('http://127.0.0.1:3000'),
   SESSION_ENCRYPTION_KEY: z.string().min(16).default('dev-only-session-encryption-key'),
+  ALLOWED_ORIGINS: z.string().default('*'),
   SESSION_TTL_MS: z.coerce.number().int().positive().default(30 * 24 * 60 * 60 * 1000),
   SESSION_STORE_PATH: z.string().min(1).optional(),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
@@ -17,8 +18,15 @@ export type GatewayConfig = z.infer<typeof envSchema>;
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): GatewayConfig {
   const config = envSchema.parse(source);
+  const sessionStorePath = config.SESSION_STORE_PATH ?? (config.NODE_ENV === 'test' ? undefined : 'D:\\tmp\\siplayer\\gateway-sessions.json');
+  if (
+    config.NODE_ENV === 'production'
+    && (config.SESSION_ENCRYPTION_KEY === 'dev-only-session-encryption-key' || config.ALLOWED_ORIGINS === '*' || !sessionStorePath)
+  ) {
+    throw new Error('Production requires a non-default SESSION_ENCRYPTION_KEY, explicit ALLOWED_ORIGINS, and SESSION_STORE_PATH.');
+  }
   return {
     ...config,
-    SESSION_STORE_PATH: config.SESSION_STORE_PATH ?? (config.NODE_ENV === 'test' ? undefined : 'D:\\tmp\\siplayer\\gateway-sessions.json'),
+    SESSION_STORE_PATH: sessionStorePath,
   };
 }

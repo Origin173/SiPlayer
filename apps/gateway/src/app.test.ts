@@ -26,6 +26,16 @@ describe('gateway foundation routes', () => {
     expect(response.headers['access-control-allow-headers']).toContain('Authorization');
   });
 
+  it('restricts CORS to configured origins', async () => {
+    const restricted = buildApp(loadConfig({ NODE_ENV: 'test', ALLOWED_ORIGINS: 'https://player.example.com' }), { logger: false });
+    const allowed = await restricted.inject({ method: 'OPTIONS', url: '/v1/search', headers: { origin: 'https://player.example.com' } });
+    const denied = await restricted.inject({ method: 'OPTIONS', url: '/v1/search', headers: { origin: 'https://evil.example.com' } });
+    await restricted.close();
+
+    expect(allowed.headers['access-control-allow-origin']).toBe('https://player.example.com');
+    expect(denied.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
   it('returns readiness without exposing upstream internals', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/ready' });
     const body = response.json<{ data: { status: string; upstream: string } }>();

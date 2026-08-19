@@ -71,6 +71,19 @@ describe('content routes', () => {
     expect(body.requestId).toMatch(/^req_/);
   });
 
+  it('rejects provider payloads that violate the stable contract', async () => {
+    const invalidApp = buildApp(loadConfig({ NODE_ENV: 'test' }), {
+      logger: false,
+      provider: { ...provider, getTrack: async () => ({ ...track, id: '' }) },
+    });
+    const response = await invalidApp.inject({ method: 'GET', url: '/v1/tracks/track-1' });
+    const body = response.json<{ error: { code: string; retryable: boolean } }>();
+    await invalidApp.close();
+
+    expect(response.statusCode).toBe(502);
+    expect(body.error).toMatchObject({ code: 'UPSTREAM_UNAVAILABLE', retryable: true });
+  });
+
   it('maps provider timeout to the stable error model', async () => {
     const timeoutApp = buildApp(loadConfig({ NODE_ENV: 'test' }), {
       logger: false,

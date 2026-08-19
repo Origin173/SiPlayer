@@ -1,4 +1,14 @@
-import { AudioQualitySchema, type ApiError, type ErrorEnvelope } from '@siplayer/contracts';
+import {
+  AudioQualitySchema,
+  CatalogSearchPageSchema,
+  LyricsSchema,
+  PlaylistDetailSchema,
+  StreamInfoSchema,
+  TrackPageSchema,
+  TrackSchema,
+  type ApiError,
+  type ErrorEnvelope,
+} from '@siplayer/contracts';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { NeteaseProviderError, type ContentProvider } from '../providers';
@@ -71,8 +81,8 @@ export function registerContentRoutes(app: FastifyInstance, options: ContentRout
     }
     try {
       const data = parsed.data.type === 'track'
-        ? await options.provider.searchTracks(parsed.data.q, parsed.data.page, parsed.data.pageSize)
-        : await options.provider.searchCatalog(parsed.data.q, parsed.data.type, parsed.data.page, parsed.data.pageSize);
+        ? TrackPageSchema.parse(await options.provider.searchTracks(parsed.data.q, parsed.data.page, parsed.data.pageSize))
+        : CatalogSearchPageSchema.parse(await options.provider.searchCatalog(parsed.data.q, parsed.data.type, parsed.data.page, parsed.data.pageSize));
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
@@ -90,7 +100,7 @@ export function registerContentRoutes(app: FastifyInstance, options: ContentRout
     }
 
     try {
-      const data = await options.provider.getTrack(parsed.data.id);
+      const data = TrackSchema.parse(await options.provider.getTrack(parsed.data.id));
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
@@ -109,7 +119,7 @@ export function registerContentRoutes(app: FastifyInstance, options: ContentRout
     }
 
     try {
-      const data = await options.provider.resolveStream(params.data.id, query.data.quality);
+      const data = StreamInfoSchema.parse(await options.provider.resolveStream(params.data.id, query.data.quality));
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
@@ -127,7 +137,7 @@ export function registerContentRoutes(app: FastifyInstance, options: ContentRout
     }
 
     try {
-      const data = await options.provider.getLyrics(parsed.data.id);
+      const data = LyricsSchema.parse(await options.provider.getLyrics(parsed.data.id));
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
@@ -145,7 +155,7 @@ export function registerContentRoutes(app: FastifyInstance, options: ContentRout
     }
 
     try {
-      const data = await options.provider.getPlaylist(parsed.data.id);
+      const data = PlaylistDetailSchema.parse(await options.provider.getPlaylist(parsed.data.id));
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));

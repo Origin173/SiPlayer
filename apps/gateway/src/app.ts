@@ -43,11 +43,20 @@ export function buildApp(
     genReqId: () => `req_${randomUUID()}`,
   });
 
+  const allowedOrigins = config.ALLOWED_ORIGINS === '*'
+    ? null
+    : new Set(config.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean));
   app.addHook('onRequest', async (request, reply) => {
+    const origin = request.headers.origin;
+    if (!allowedOrigins) {
+      reply.header('Access-Control-Allow-Origin', '*');
+    } else if (origin && allowedOrigins.has(origin)) {
+      reply.header('Access-Control-Allow-Origin', origin).header('Vary', 'Origin');
+    }
     reply
-      .header('Access-Control-Allow-Origin', '*')
       .header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-      .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      .header('Access-Control-Max-Age', '600');
     if (request.method === 'OPTIONS') return reply.status(204).send();
   });
 

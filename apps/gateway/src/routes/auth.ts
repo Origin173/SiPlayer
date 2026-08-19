@@ -1,3 +1,10 @@
+import {
+  LikeResultSchema,
+  PlaylistCollectionsSchema,
+  TrackPageSchema,
+  TrackSchema,
+  UserProfileSchema,
+} from '@siplayer/contracts';
 import type {
   ApiError,
   ErrorEnvelope,
@@ -106,7 +113,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
       const status = await options.provider.checkQr(challenge.upstreamKey);
       if (status.status === 'AUTHORIZED') {
         if (!status.cookie) return sendError(reply, request, { code: 'UPSTREAM_UNAVAILABLE', message: 'Login completed without a session.', retryable: true });
-        const user = await options.provider.getCurrentUser(status.cookie);
+        const user = UserProfileSchema.parse(await options.provider.getCurrentUser(status.cookie));
         const session = options.sessions.create(user, status.cookie);
         options.challenges.delete(challenge.id);
         const data: QrStatusData = { status: 'AUTHORIZED', sessionToken: session.token, user };
@@ -123,7 +130,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
   app.get('/v1/auth/me', async (request, reply) => {
     const auth = getSession(request, options.sessions);
     if (isApiError(auth)) return sendError(reply, request, auth);
-    const data: UserProfile = auth.session.user;
+    const data: UserProfile = UserProfileSchema.parse(auth.session.user);
     return { data, requestId: requestId(request) };
   });
 
@@ -139,7 +146,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     const auth = getSession(request, options.sessions);
     if (isApiError(auth)) return sendError(reply, request, auth);
     try {
-      const data: PlaylistCollections = await options.provider.getUserPlaylists(auth.session.user.id, auth.session.cookie);
+      const data: PlaylistCollections = PlaylistCollectionsSchema.parse(await options.provider.getUserPlaylists(auth.session.user.id, auth.session.cookie));
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
@@ -150,8 +157,9 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     const auth = getSession(request, options.sessions);
     if (isApiError(auth)) return sendError(reply, request, auth);
     try {
-      const items: Track[] = await options.provider.getLikedTracks(auth.session.user.id, auth.session.cookie);
-      return { data: { items, page: 1, pageSize: items.length || 1, hasMore: false }, requestId: requestId(request) };
+      const items: Track[] = TrackSchema.array().parse(await options.provider.getLikedTracks(auth.session.user.id, auth.session.cookie));
+      const data = TrackPageSchema.parse({ items, page: 1, pageSize: items.length || 1, hasMore: false });
+      return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
     }
@@ -161,8 +169,9 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     const auth = getSession(request, options.sessions);
     if (isApiError(auth)) return sendError(reply, request, auth);
     try {
-      const items: Track[] = await options.provider.getRecentTracks(auth.session.user.id, auth.session.cookie);
-      return { data: { items, page: 1, pageSize: items.length || 1, hasMore: false }, requestId: requestId(request) };
+      const items: Track[] = TrackSchema.array().parse(await options.provider.getRecentTracks(auth.session.user.id, auth.session.cookie));
+      const data = TrackPageSchema.parse({ items, page: 1, pageSize: items.length || 1, hasMore: false });
+      return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
     }
@@ -179,7 +188,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
         if (!parsed.success) return sendError(reply, request, { code: 'VALIDATION_ERROR', message: 'Track id is invalid.', retryable: false });
         try {
           const result = await options.provider.setTrackLiked(parsed.data.id, liked, auth.session.cookie);
-          const data: LikeResult = { liked: result };
+          const data: LikeResult = LikeResultSchema.parse({ liked: result });
           return { data, requestId: requestId(request) };
         } catch (error) {
           return sendError(reply, request, normalizeProviderError(error));
