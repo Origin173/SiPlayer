@@ -32,4 +32,18 @@ describe('app settings storage', () => {
 
     await expect(loadAppSettings()).resolves.toEqual({ themePreference: 'dark', quality: 'high' });
   });
+
+  it('serializes concurrent updates instead of losing fields', async () => {
+    await Promise.all([
+      updateAppSettings({ themePreference: 'light' }),
+      updateAppSettings({ quality: 'lossless' }),
+      updateAppSettings({ playbackMode: 'repeat_all' }),
+    ]);
+
+    await expect(loadAppSettings()).resolves.toEqual({
+      themePreference: 'light',
+      quality: 'lossless',
+      playbackMode: 'repeat_all',
+    });
+  });
 });

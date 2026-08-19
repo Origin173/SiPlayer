@@ -6,6 +6,7 @@ export { AppSettingsSchema, ThemePreferenceSchema } from './appSettingsModel';
 export type { AppSettings, ThemePreference } from './appSettingsModel';
 
 const settingsStorageKey = 'siplayer-app-settings';
+let settingsWriteQueue: Promise<void> = Promise.resolve();
 
 function nativeSettingsFile(): File {
   return new File(Paths.document, 'siplayer-app-settings.json');
@@ -32,17 +33,21 @@ export async function loadAppSettings(): Promise<AppSettings> {
 }
 
 export async function updateAppSettings(update: Partial<AppSettings>): Promise<void> {
-  const current = await loadAppSettings();
-  try {
-    const next = AppSettingsSchema.parse({ ...current, ...update });
-    if (Platform.OS === 'web') {
-      if (typeof globalThis.localStorage !== 'undefined') globalThis.localStorage.setItem(settingsStorageKey, JSON.stringify(next));
-      return;
+  const operation = settingsWriteQueue.then(async () => {
+    const current = await loadAppSettings();
+    try {
+      const next = AppSettingsSchema.parse({ ...current, ...update });
+      if (Platform.OS === 'web') {
+        if (typeof globalThis.localStorage !== 'undefined') globalThis.localStorage.setItem(settingsStorageKey, JSON.stringify(next));
+        return;
+      }
+      const settingsFile = nativeSettingsFile();
+      if (!settingsFile.exists) settingsFile.create({ overwrite: true });
+      settingsFile.write(JSON.stringify(next));
+    } catch {
+      // Settings are a best-effort local preference and never block playback.
     }
-    const settingsFile = nativeSettingsFile();
-    if (!settingsFile.exists) settingsFile.create({ overwrite: true });
-    settingsFile.write(JSON.stringify(next));
-  } catch {
-    // Settings are a best-effort local preference and never block playback.
-  }
+  });
+  settingsWriteQueue = operation.catch(() => undefined);
+  await operation;
 }

@@ -3,6 +3,7 @@ import type { Track } from '@siplayer/contracts';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '@/theme';
 import { Artwork } from './Artwork';
+import { getQueueRowActionState } from './queueRowActions';
 
 interface SongRowProps {
   track: Track;
@@ -16,6 +17,11 @@ interface SongRowProps {
 export function SongRow({ track, onPress, onRemove, onMoveUp, onMoveDown, isCurrent = false }: SongRowProps) {
   const { theme } = useTheme();
   const disabled = !track.playable;
+  const { showMoveControls, showRemove } = getQueueRowActionState({
+    canMoveUp: Boolean(onMoveUp),
+    canMoveDown: Boolean(onMoveDown),
+    canRemove: Boolean(onRemove),
+  });
 
   return (
     <Pressable
@@ -40,16 +46,18 @@ export function SongRow({ track, onPress, onRemove, onMoveUp, onMoveDown, isCurr
       </View>
       <View style={styles.trailing}>
         {isCurrent ? <Ionicons color={theme.colors.primary} name="volume-high-outline" size={20} /> : null}
-        {onMoveUp || onMoveDown ? (
+        {showMoveControls ? (
           <View style={styles.reorderButtons}>
             {onMoveUp ? <Pressable accessibilityLabel={`上移 ${track.name}`} accessibilityRole="button" hitSlop={6} onPress={onMoveUp}><Ionicons color={theme.colors.textSecondary} name="chevron-up" size={18} /></Pressable> : null}
             {onMoveDown ? <Pressable accessibilityLabel={`下移 ${track.name}`} accessibilityRole="button" hitSlop={6} onPress={onMoveDown}><Ionicons color={theme.colors.textSecondary} name="chevron-down" size={18} /></Pressable> : null}
           </View>
-        ) : onRemove ? (
+        ) : null}
+        {showRemove ? (
           <Pressable accessibilityLabel={`从队列移除 ${track.name}`} accessibilityRole="button" hitSlop={8} onPress={onRemove}>
             <Ionicons color={theme.colors.textTertiary} name="close-circle-outline" size={21} />
           </Pressable>
-        ) : <Ionicons color={theme.colors.textTertiary} name="ellipsis-horizontal" size={22} />}
+        ) : null}
+        {!showMoveControls && !showRemove ? <Ionicons color={theme.colors.textTertiary} name="ellipsis-horizontal" size={22} /> : null}
       </View>
     </Pressable>
   );
