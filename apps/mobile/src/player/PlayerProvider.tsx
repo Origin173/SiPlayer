@@ -35,7 +35,8 @@ const PlayerContext = createContext<PlayerController | null>(null);
 export function PlayerProvider({ children }: PropsWithChildren) {
   const audioPlayer = useAudioPlayer(null, { updateInterval: 500, keepAudioSessionActive: true });
   const audioStatus = useAudioPlayerStatus(audioPlayer);
-  const setQueue = usePlayerStore((state) => state.setQueue);
+  const replaceQueue = usePlayerStore((state) => state.replaceQueue);
+  const mutateQueue = usePlayerStore((state) => state.mutateQueue);
   const reorderQueue = usePlayerStore((state) => state.reorderQueue);
   const setPlaybackState = usePlayerStore((state) => state.setPlaybackState);
   const setPlaybackMode = usePlayerStore((state) => state.setPlaybackMode);
@@ -178,12 +179,12 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const setPlayerQueue = useCallback(
     (items: QueueItem[], startIndex = 0) => {
       audioPlayer.pause();
-      setQueue(items, startIndex);
+      replaceQueue(items, startIndex);
       const safeIndex = items.length > 0 ? Math.min(Math.max(startIndex, 0), items.length - 1) : -1;
       const item = items[safeIndex];
       if (item) void resolveAndPlay(item);
     },
-    [audioPlayer, resolveAndPlay, setQueue],
+    [audioPlayer, replaceQueue, resolveAndPlay],
   );
 
   const playTrack = useCallback(
@@ -227,21 +228,17 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       const state = usePlayerStore.getState();
       const nextQueue = [...state.queue];
       nextQueue.splice(Math.max(state.currentIndex + 1, 0), 0, item);
-      setQueue(nextQueue, state.currentIndex < 0 ? 0 : state.currentIndex);
-      setPosition(state.positionMs, state.durationMs);
-      setPlaybackState(state.playbackState);
+      mutateQueue(nextQueue, state.currentIndex < 0 ? 0 : state.currentIndex);
     },
-    [setPlaybackState, setPosition, setQueue],
+    [mutateQueue],
   );
 
   const addToQueue = useCallback(
     (item: QueueItem) => {
       const state = usePlayerStore.getState();
-      setQueue([...state.queue, item], state.currentIndex < 0 ? 0 : state.currentIndex);
-      setPosition(state.positionMs, state.durationMs);
-      setPlaybackState(state.playbackState);
+      mutateQueue([...state.queue, item], state.currentIndex < 0 ? 0 : state.currentIndex);
     },
-    [setPlaybackState, setPosition, setQueue],
+    [mutateQueue],
   );
 
   const removeFromQueue = useCallback(
@@ -258,26 +255,22 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       }
       const nextIndex = Math.min(state.currentIndex > index ? state.currentIndex - 1 : state.currentIndex, nextQueue.length - 1);
       if (index === state.currentIndex) audioPlayer.pause();
-      setQueue(nextQueue, Math.max(nextIndex, 0));
+      mutateQueue(nextQueue, Math.max(nextIndex, 0));
       if (index === state.currentIndex) {
         const nextItem = nextQueue[Math.max(nextIndex, 0)];
         if (nextItem) void resolveAndPlay(nextItem);
       } else {
-        setPosition(state.positionMs, state.durationMs);
-        setPlaybackState(state.playbackState);
       }
     },
-    [audioPlayer, clear, resolveAndPlay, setPlaybackState, setPosition, setQueue],
+    [audioPlayer, clear, mutateQueue, resolveAndPlay],
   );
 
   const clearNext = useCallback(() => {
     const state = usePlayerStore.getState();
     if (state.currentIndex < 0 || state.currentIndex >= state.queue.length - 1) return;
     const nextQueue = state.queue.slice(0, state.currentIndex + 1);
-    setQueue(nextQueue, state.currentIndex);
-    setPosition(state.positionMs, state.durationMs);
-    setPlaybackState(state.playbackState);
-  }, [setPlaybackState, setPosition, setQueue]);
+    mutateQueue(nextQueue, state.currentIndex);
+  }, [mutateQueue]);
 
   const clearQueue = useCallback(() => {
     generationRef.current += 1;

@@ -14,7 +14,7 @@ beforeEach(() => {
 
 describe('player store', () => {
   it('keeps an empty queue in the idle state', () => {
-    usePlayerStore.getState().setQueue([], 4);
+    usePlayerStore.getState().replaceQueue([], 4);
     const state = usePlayerStore.getState();
 
     expect(state.queue).toEqual([]);
@@ -25,7 +25,7 @@ describe('player store', () => {
   });
 
   it('clamps the selected queue index and initializes the current duration', () => {
-    usePlayerStore.getState().setQueue(items, 99);
+    usePlayerStore.getState().replaceQueue(items, 99);
     const state = usePlayerStore.getState();
 
     expect(state.currentIndex).toBe(1);
@@ -34,7 +34,7 @@ describe('player store', () => {
   });
 
   it('preserves progress metadata while changing playback state', () => {
-    usePlayerStore.getState().setQueue(items, 0);
+    usePlayerStore.getState().replaceQueue(items, 0);
     usePlayerStore.getState().setPosition(450, 1000);
     usePlayerStore.getState().setPlaybackState('playing');
     const state = usePlayerStore.getState();
@@ -45,7 +45,7 @@ describe('player store', () => {
   });
 
   it('clears queue and playback metadata together', () => {
-    usePlayerStore.getState().setQueue(items, 1);
+    usePlayerStore.getState().replaceQueue(items, 1);
     usePlayerStore.getState().setPosition(700, 2000);
     usePlayerStore.getState().setPlaybackState('playing');
     usePlayerStore.getState().clear();
@@ -56,6 +56,21 @@ describe('player store', () => {
       playbackState: 'idle',
       positionMs: 0,
       durationMs: 0,
+    });
+  });
+
+  it('mutates queue contents without resetting playback progress', () => {
+    usePlayerStore.getState().replaceQueue(items, 0);
+    usePlayerStore.getState().setPosition(450, 1000);
+    usePlayerStore.getState().setPlaybackState('playing');
+
+    usePlayerStore.getState().mutateQueue([...items, { trackId: 'c', title: 'C', artistText: 'Artist', durationMs: 3000 }]);
+
+    expect(usePlayerStore.getState()).toMatchObject({
+      currentIndex: 0,
+      playbackState: 'playing',
+      positionMs: 450,
+      durationMs: 1000,
     });
   });
 });
