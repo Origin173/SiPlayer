@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { ErrorEnvelopeSchema, SuccessEnvelopeSchema, type ApiErrorCode } from '@siplayer/contracts';
+import { notifySessionExpired } from '../auth/sessionEvents';
 
 export class ApiError extends Error {
   readonly code: ApiErrorCode;
@@ -65,7 +66,7 @@ export class ApiClient {
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       try {
-        return await this.requestOnce(path, options, headers, schema);
+        return await this.requestOnce(path, options, headers, Boolean(token), schema);
       } catch (error) {
         if (!this.shouldRetry(error, method, attempt, options.signal)) throw error;
       }
@@ -82,6 +83,7 @@ export class ApiClient {
     path: string,
     options: RequestInit,
     headers: Headers,
+    hasSessionToken: boolean,
     schema?: z.ZodType<T>,
   ): Promise<{ data: T; requestId: string }> {
     const controller = new AbortController();
@@ -126,18 +128,22 @@ export class ApiClient {
       if (!response.ok) {
         const errorPayload = ErrorEnvelopeSchema.safeParse(payload);
         if (errorPayload.success) {
-          throw new ApiError(errorPayload.data.error.message, {
+          const error = new ApiError(errorPayload.data.error.message, {
             code: errorPayload.data.error.code,
             retryable: errorPayload.data.error.retryable,
             status: response.status,
             requestId: errorPayload.data.requestId,
           });
+          if (error.code === 'AUTH_EXPIRED' || (error.code === 'AUTH_REQUIRED' && hasSessionToken)) notifySessionExpired();
+          throw error;
         }
-        throw new ApiError('音乐服务暂时不可用', {
+        const error = new ApiError('音乐服务暂时不可用', {
           code: response.status === 401 ? 'AUTH_REQUIRED' : 'UPSTREAM_UNAVAILABLE',
           retryable: response.status >= 500,
           status: response.status,
         });
+        if (response.status === 401 && hasSessionToken) notifySessionExpired();
+        throw error;
       }
 
       const envelope = SuccessEnvelopeSchema.safeParse(payload);

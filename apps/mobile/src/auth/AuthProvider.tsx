@@ -10,6 +10,7 @@ import {
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { ApiError, apiClient } from '@/api/client';
 import { clearSessionToken, getSessionToken, setSessionToken } from './session';
+import { setSessionExpiredListener } from './sessionEvents';
 
 export interface AuthController {
   user: UserProfile | null;
@@ -28,6 +29,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
 
+  const expireSession = useCallback(async () => {
+    await clearSessionToken();
+    queryClient.removeQueries({ queryKey: ['me'] });
+    setUser(null);
+  }, [queryClient]);
+
+  useEffect(() => setSessionExpiredListener(expireSession), [expireSession]);
+
   const refresh = useCallback(async () => {
     const token = await getSessionToken();
     if (!token) {
@@ -39,14 +48,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setUser(response.data);
     } catch (error) {
       if (error instanceof ApiError && (error.code === 'AUTH_EXPIRED' || error.code === 'AUTH_REQUIRED')) {
-        await clearSessionToken();
-        queryClient.removeQueries({ queryKey: ['me'] });
-        setUser(null);
+        await expireSession();
         return;
       }
       throw error;
     }
-  }, [queryClient]);
+  }, [expireSession]);
 
   useEffect(() => {
     void refresh()
@@ -74,11 +81,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } catch {
       // A revoked or expired server session is already logged out.
     } finally {
-      await clearSessionToken();
-      queryClient.removeQueries({ queryKey: ['me'] });
-      setUser(null);
+      await expireSession();
     }
-  }, [queryClient]);
+  }, [expireSession]);
 
   const value = useMemo<AuthController>(
     () => ({ user, isHydrating, isAuthenticated: Boolean(user), refresh, startQr, pollQr, logout }),

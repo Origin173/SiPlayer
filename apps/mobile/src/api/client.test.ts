@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClient } from './clientCore';
+import { setSessionExpiredListener } from '../auth/sessionEvents';
 
 function successResponse(data: unknown = { ok: true }): Response {
   return new Response(JSON.stringify({ data, requestId: 'req_test' }), {
@@ -68,5 +69,19 @@ describe('ApiClient', () => {
 
     await expect(request).rejects.toMatchObject({ name: 'AbortError' });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies the auth boundary when a session-bearing request expires', async () => {
+    const onExpired = vi.fn();
+    const removeListener = setSessionExpiredListener(onExpired);
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      error: { code: 'AUTH_EXPIRED', message: 'Your login session has expired.', retryable: false },
+      requestId: 'req_test',
+    }), { status: 401, headers: { 'content-type': 'application/json' } }));
+    const client = new ApiClient({ baseUrl: 'http://gateway.test', fetchImpl, getToken: async () => 'project-token' });
+
+    await expect(client.request('/v1/me/playlists')).rejects.toMatchObject({ code: 'AUTH_EXPIRED' });
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    removeListener();
   });
 });
