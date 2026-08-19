@@ -38,10 +38,10 @@ git push origin v0.1.0
 
 ## 原生 APK / IPA 构建
 
-工作流会在质量门禁通过后使用 EAS Build 云构建两个原生包：
+由于当前还没有 Apple Developer 签名凭据，工作流暂时只使用 EAS Build 云构建 Android 原生包。iOS 构建矩阵已注释，获得 Apple Developer 凭据后再恢复。
 
 - Android：`siplayer-vX.Y.Z-android.apk`，明确使用 APK 格式，可下载到 Android 设备直接安装。
-- iOS：`siplayer-vX.Y.Z-ios.ipa`，使用 Apple store distribution 签名，可下载并提交到 TestFlight/App Store。
+- iOS：暂时不构建。没有 Apple Developer 账户时，不能生成可安装到真实 iPhone 或提交 TestFlight/App Store 的正式 IPA。
 
 首次启用前需要完成 EAS 项目初始化和原生签名凭据配置。下面的本地构建命令只建议每个平台首次运行一次，用于验证配置并让 EAS 按提示创建或保存凭据；之后不需要每次发布都运行。配置完成后，GitHub Actions 会自动执行同样的云构建。
 
@@ -57,10 +57,11 @@ $env:EXPO_PUBLIC_GATEWAY_URL = "https://你的-gateway-域名.example.com"
 pnpm dlx eas-cli@latest login
 pnpm dlx eas-cli@latest init
 pnpm dlx eas-cli@latest build --platform android --profile release
-pnpm dlx eas-cli@latest build --platform ios --profile release
+# iOS requires Apple Developer credentials and is currently disabled.
+# pnpm dlx eas-cli@latest build --platform ios --profile release
 ```
 
-如果 Expo 控制台已经显示该平台有成功的 EAS 构建，或者对应平台的凭据已经配置完成，可以跳过该平台的本地构建。当前发布工作流会同时构建 Android 和 iOS，因此要让 tag 发布完整通过，两个平台的 EAS 凭据都必须可用。
+如果 Expo 控制台已经显示 Android 有成功的 EAS 构建，或者 Android 凭据已经配置完成，可以跳过本地构建。当前发布工作流只构建 Android，因此暂时不需要 iOS 签名凭据。
 
 ### GitHub Actions 配置项
 
@@ -95,13 +96,14 @@ Name:  EXPO_PUBLIC_GATEWAY_URL
 Value: https://你的-gateway-域名.example.com
 ```
 
-`EXPO_PUBLIC_GATEWAY_URL` 会被打包进客户端，因此它不是密码。它必须是手机可以访问的公网 HTTPS 地址，不能使用 `127.0.0.1`、`localhost` 或仅在服务器内部可访问的地址。修改这个 Variable 后，必须重新创建一个 tag 并重新构建 APK/IPA，已经下载的安装包不会自动更新。
+`EXPO_PUBLIC_GATEWAY_URL` 会被打包进客户端，因此它不是密码。它必须是手机可以访问的公网 HTTPS 地址，不能使用 `127.0.0.1`、`localhost` 或仅在服务器内部可访问的地址。修改这个 Variable 后，必须重新创建一个 tag 并重新构建 APK；已经下载的安装包不会自动更新。
 
 #### 当前不需要添加的配置
 
 - `GITHUB_TOKEN`：GitHub Actions 自动提供，工作流用于创建 Release 和回写 changelog，不需要手动创建。
-- Android keystore、iOS distribution certificate、provisioning profile：由 EAS Credentials 托管，不要复制到 GitHub Secret。首次本地 EAS 构建时按提示完成凭据配置。
-- `APPLE_ID`、`ASC_API_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY`：当前工作流只构建并上传 IPA 到 GitHub Release，不执行 TestFlight/App Store 提交，因此暂时不需要。以后增加 `eas submit` 时再单独配置。
+- Android keystore：由 EAS Credentials 托管，不要复制到 GitHub Secret。首次本地 EAS 构建时按提示完成凭据配置。
+- iOS distribution certificate、provisioning profile：当前 iOS job 已暂停，暂时不需要；恢复 iOS 构建前必须配置 Apple Developer 凭据。
+- `APPLE_ID`、`ASC_API_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY`：当前 iOS job 已暂停，且工作流不执行 TestFlight/App Store 提交，因此暂时不需要。以后恢复 iOS 或增加 `eas submit` 时再单独配置。
 - `NETEASE_API_BASE_URL`、`SESSION_ENCRYPTION_KEY`、`SESSION_STORE_PATH`：这些是 Gateway 服务器环境变量，不应写进 App 构建配置，也不应暴露给移动端。
 
 配置完成后可使用 GitHub CLI 更新地址：
@@ -117,7 +119,7 @@ git tag v0.1.0-alpha.2
 git push origin v0.1.0-alpha.2
 ```
 
-EAS 负责保存 Android keystore 和 iOS signing credentials；不要把证书、私钥或 token 提交到仓库。GitHub Actions 只通过 `EXPO_TOKEN` 触发云构建。
+EAS 负责保存 Android keystore；不要把证书、私钥或 token 提交到仓库。GitHub Actions 只通过 `EXPO_TOKEN` 触发 Android 云构建。
 
 注意：Android APK 可以直接下载安装（设备可能需要允许安装未知来源应用）。普通 iOS 用户不能仅凭下载的 IPA 直接安装；IPA 必须通过 TestFlight/App Store，或使用 Ad Hoc/Enterprise 签名并满足 Apple 的设备注册/企业分发条件。这是 Apple 的分发限制，不是 CI 能绕过的限制。
 

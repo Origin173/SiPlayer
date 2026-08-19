@@ -82,8 +82,10 @@ jobs:
         include:
           - platform: android
             extension: apk
-          - platform: ios
-            extension: ipa
+          # iOS device builds are temporarily disabled until Apple Developer
+          # signing credentials are available. Re-enable this entry later.
+          # - platform: ios
+          #   extension: ipa
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
