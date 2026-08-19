@@ -1,5 +1,5 @@
 import { AudioQualitySchema, StreamInfoSchema, type AudioQuality, type StreamInfo } from '@siplayer/contracts';
-import { apiClient } from '@/api/client';
+import { apiClient } from '../api/client';
 
 export async function resolveStream(trackId: string, quality: AudioQuality = 'auto'): Promise<StreamInfo> {
   const safeQuality = AudioQualitySchema.parse(quality);

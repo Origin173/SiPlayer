@@ -1,16 +1,18 @@
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import type { AudioQuality } from '@siplayer/contracts';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
-import { ApiError } from '@/api/client';
-import { recordLocalTrack } from '@/features/localHistory';
-import { loadAppSettings, updateAppSettings } from '@/storage/appSettings';
+import { recordLocalTrack } from '../features/localHistory';
+import { loadAppSettings, updateAppSettings } from '../storage/appSettings';
 import { resolveStream } from './playbackResolver';
+import { isNewAudioError, isNewAudioFinish, resolveAndPlayTrack, shouldHandleAudioStatus } from './playbackRuntime';
+import { canApplyHydratedSetting, markSettingsHydrated, markUserSettingOverride, type SettingsHydrationGuard } from './settingsHydration';
 import { nextQueueIndex } from './playbackModes';
 import type { PlayContext, PlaybackMode, QueueItem } from './playbackTypes';
 import { usePlayerStore } from './playerStore';
 
 export interface PlayerController {
   playTrack: (track: QueueItem, context?: PlayContext) => void;
+  playQueueIndex: (index: number) => void;
   play: () => void;
   pause: () => void;
   toggle: () => void;
@@ -41,11 +43,26 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const setPosition = usePlayerStore((state) => state.setPosition);
   const setCurrentIndex = usePlayerStore((state) => state.setCurrentIndex);
   const clear = usePlayerStore((state) => state.clear);
+  const mountedRef = useRef(true);
   const generationRef = useRef(0);
   const resolvedTrackIdRef = useRef<string | null>(null);
   const streamRetryCountRef = useRef(0);
-  const finishHandledGenerationRef = useRef(-1);
+  const audioErrorRef = useRef(false);
+  const didJustFinishRef = useRef(false);
   const nextRef = useRef<() => void>(() => undefined);
+  const settingsHydrationRef = useRef<SettingsHydrationGuard>({
+    hydrated: false,
+    overridden: { quality: false, playbackMode: false },
+  });
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      resolvedTrackIdRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     void setAudioModeAsync({
@@ -56,10 +73,17 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     void loadAppSettings().then((settings) => {
-      if (settings.playbackMode) setPlaybackMode(settings.playbackMode);
-      if (settings.quality) setPlaybackQuality(settings.quality);
+      if (cancelled) return;
+      const guard = settingsHydrationRef.current;
+      if (settings.playbackMode && canApplyHydratedSetting(guard, 'playbackMode')) setPlaybackMode(settings.playbackMode);
+      if (settings.quality && canApplyHydratedSetting(guard, 'quality')) setPlaybackQuality(settings.quality);
+      markSettingsHydrated(guard);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [setPlaybackMode, setPlaybackQuality]);
 
   const resolveAndPlay = useCallback(
@@ -67,27 +91,26 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       const generation = ++generationRef.current;
       if (!isRetry) streamRetryCountRef.current = 0;
       resolvedTrackIdRef.current = null;
-      setPlaybackState('resolving');
 
-      try {
-        const stream = await resolveStream(item.trackId, usePlayerStore.getState().quality);
-        if (generation !== generationRef.current) return;
-        audioPlayer.replace({ uri: stream.url, name: item.title });
-        audioPlayer.setActiveForLockScreen(true, {
-          title: item.title,
-          artist: item.artistText,
-          ...(item.albumTitle ? { albumTitle: item.albumTitle } : {}),
-          ...(item.artworkUrl ? { artworkUrl: item.artworkUrl } : {}),
-        });
-        resolvedTrackIdRef.current = item.trackId;
-        if (!isRetry && item.track) void recordLocalTrack(item.track);
-        setPlaybackState('loading');
-        audioPlayer.play();
-      } catch (error) {
-        if (generation !== generationRef.current) return;
-        resolvedTrackIdRef.current = null;
-        setPlaybackState(error instanceof ApiError && error.code === 'TRACK_UNAVAILABLE' ? 'unavailable' : 'error');
-      }
+      const result = await resolveAndPlayTrack({
+        item,
+        quality: usePlayerStore.getState().quality,
+        isRetry,
+        resolve: resolveStream,
+        isCurrent: () => mountedRef.current && generation === generationRef.current,
+        audio: {
+          replace: (source) => audioPlayer.replace(source),
+          setActiveForLockScreen: (active, metadata) => audioPlayer.setActiveForLockScreen(active, metadata),
+          play: () => audioPlayer.play(),
+        },
+        setPlaybackState,
+        onStarted: () => {
+          resolvedTrackIdRef.current = item.trackId;
+          if (!isRetry && item.track) void recordLocalTrack(item.track);
+        },
+      });
+
+      if (result.status === 'failed') resolvedTrackIdRef.current = null;
     },
     [audioPlayer, setPlaybackState],
   );
@@ -102,6 +125,10 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     [resolveAndPlay, setCurrentIndex],
   );
 
+  const playQueueIndex = useCallback((index: number) => {
+    goToIndex(index);
+  }, [goToIndex]);
+
   const play = useCallback(() => {
     const state = usePlayerStore.getState();
     const item = state.queue[state.currentIndex];
@@ -115,7 +142,12 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   }, [audioPlayer, resolveAndPlay, setPlaybackState]);
 
   const pause = useCallback(() => {
-    if (usePlayerStore.getState().queue.length === 0) return;
+    const state = usePlayerStore.getState();
+    if (state.queue.length === 0) return;
+    if (state.playbackState === 'resolving') {
+      generationRef.current += 1;
+      resolvedTrackIdRef.current = null;
+    }
     audioPlayer.pause();
     setPlaybackState('paused');
   }, [audioPlayer, setPlaybackState]);
@@ -239,6 +271,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
 
   const setQuality = useCallback(
     (quality: AudioQuality) => {
+      markUserSettingOverride(settingsHydrationRef.current, 'quality');
       setPlaybackQuality(quality);
       void updateAppSettings({ quality });
       const state = usePlayerStore.getState();
@@ -249,6 +282,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   );
 
   const setMode = useCallback((mode: PlaybackMode) => {
+    markUserSettingOverride(settingsHydrationRef.current, 'playbackMode');
     setPlaybackMode(mode);
     void updateAppSettings({ playbackMode: mode });
   }, [setPlaybackMode]);
@@ -263,14 +297,20 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   );
 
   useEffect(() => {
+    const hasAudioError = Boolean(audioStatus.error);
+    const justErrored = isNewAudioError(hasAudioError, audioErrorRef.current);
+    audioErrorRef.current = hasAudioError;
+    const justFinished = isNewAudioFinish(audioStatus.didJustFinish, didJustFinishRef.current);
+    didJustFinishRef.current = audioStatus.didJustFinish;
     const state = usePlayerStore.getState();
     const current = state.queue[state.currentIndex];
-    if (!current) return;
+    if (!current || !shouldHandleAudioStatus(current.trackId, resolvedTrackIdRef.current)) return;
 
     const durationMs = audioStatus.duration > 0 ? Math.floor(audioStatus.duration * 1000) : current.durationMs ?? 0;
     setPosition(Math.floor(audioStatus.currentTime * 1000), durationMs);
 
-    if (audioStatus.error) {
+    if (hasAudioError) {
+      if (!justErrored) return;
       if (streamRetryCountRef.current === 0 && resolvedTrackIdRef.current === current.trackId) {
         streamRetryCountRef.current = 1;
         void resolveAndPlay(current, true);
@@ -280,10 +320,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       return;
     }
     if (audioStatus.didJustFinish) {
-      if (finishHandledGenerationRef.current !== generationRef.current) {
-        finishHandledGenerationRef.current = generationRef.current;
-        nextRef.current();
-      }
+      if (justFinished) nextRef.current();
       return;
     }
     if (audioStatus.isBuffering) setPlaybackState('buffering');
@@ -294,6 +331,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const controller = useMemo<PlayerController>(
     () => ({
       playTrack,
+      playQueueIndex,
       play,
       pause,
       toggle,
@@ -310,7 +348,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       setMode,
       setQuality,
     }),
-    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, reorderQueue, seekTo, setMode, setPlayerQueue, setQuality, toggle],
+    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playQueueIndex, playTrack, previous, removeFromQueue, reorderQueue, seekTo, setMode, setPlayerQueue, setQuality, toggle],
   );
 
   return <PlayerContext.Provider value={controller}>{children}</PlayerContext.Provider>;

@@ -7,8 +7,9 @@ import {
   type QrStatusData,
   type UserProfile,
 } from '@siplayer/contracts';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-import { ApiError, apiClient } from '@/api/client';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
+import { apiClient } from '../api/client';
+import { ApiError } from '../api/clientCore';
 import { clearSessionToken, getSessionToken, setSessionToken } from './session';
 import { setSessionExpiredListener } from './sessionEvents';
 
@@ -26,13 +27,14 @@ const AuthContext = createContext<AuthController | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
+  const mountedRef = useRef(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isHydrating, setIsHydrating] = useState(true);
 
   const expireSession = useCallback(async () => {
     await clearSessionToken();
     queryClient.removeQueries({ queryKey: ['me'] });
-    setUser(null);
+    if (mountedRef.current) setUser(null);
   }, [queryClient]);
 
   useEffect(() => setSessionExpiredListener(expireSession), [expireSession]);
@@ -40,12 +42,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const refresh = useCallback(async () => {
     const token = await getSessionToken();
     if (!token) {
-      setUser(null);
+      if (mountedRef.current) setUser(null);
       return;
     }
     try {
       const response = await apiClient.request('/v1/auth/me', undefined, UserProfileSchema);
-      setUser(response.data);
+      if (mountedRef.current) setUser(response.data);
     } catch (error) {
       if (error instanceof ApiError && (error.code === 'AUTH_EXPIRED' || error.code === 'AUTH_REQUIRED')) {
         await expireSession();
@@ -56,9 +58,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [expireSession]);
 
   useEffect(() => {
+    mountedRef.current = true;
     void refresh()
-      .catch(() => setUser(null))
-      .finally(() => setIsHydrating(false));
+      .catch(() => {
+        if (mountedRef.current) setUser(null);
+      })
+      .finally(() => {
+        if (mountedRef.current) setIsHydrating(false);
+      });
+    return () => {
+      mountedRef.current = false;
+    };
   }, [refresh]);
 
   const startQr = useCallback(async () => {
@@ -70,7 +80,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     const response = await apiClient.request(`/v1/auth/qr/${encodeURIComponent(challengeId)}`, undefined, QrStatusDataSchema);
     if (response.data.status === 'AUTHORIZED') {
       await setSessionToken(response.data.sessionToken);
-      setUser(response.data.user);
+      if (mountedRef.current) setUser(response.data.user);
     }
     return response.data;
   }, []);
