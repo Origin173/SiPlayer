@@ -6,6 +6,7 @@ param(
   [string]$PlaylistId,
   [switch]$IncludeQr,
   [switch]$SkipNegativeChecks,
+  [switch]$AcceptExpectedTrackErrors,
   [int]$TimeoutSec = 15
 )
 
@@ -69,9 +70,39 @@ function Assert-RequestId($Response, [string]$Name) {
   }
 }
 
+function Get-ResponseErrorCode($Response) {
+  if ($null -ne $Response.Body -and $null -ne $Response.Body.error) {
+    return [string]$Response.Body.error.code
+  }
+  return ''
+}
+
+function Get-ResponseRequestId($Response) {
+  if ($null -ne $Response.Body -and -not [string]::IsNullOrWhiteSpace([string]$Response.Body.requestId)) {
+    return [string]$Response.Body.requestId
+  }
+  return ''
+}
+
+function Throw-ResponseFailure($Response, [string]$Name) {
+  $code = Get-ResponseErrorCode $Response
+  $requestId = Get-ResponseRequestId $Response
+  $diagnostic = "HTTP $($Response.StatusCode)"
+  if ($null -ne $Response.Body -and $null -ne $Response.Body.data) {
+    if (-not [string]::IsNullOrWhiteSpace([string]$Response.Body.data.status)) { $diagnostic += ", data.status=$($Response.Body.data.status)" }
+    if (-not [string]::IsNullOrWhiteSpace([string]$Response.Body.data.upstream)) { $diagnostic += ", data.upstream=$($Response.Body.data.upstream)" }
+  }
+  if (-not [string]::IsNullOrWhiteSpace($code)) { $diagnostic += ", error.code=$code" }
+  if (-not [string]::IsNullOrWhiteSpace($requestId)) { $diagnostic += ", requestId=$requestId" }
+  $exception = [System.Exception]::new("$Name failed ($diagnostic).")
+  if (-not [string]::IsNullOrWhiteSpace($code)) { $exception.Data['gatewaySmokeCode'] = $code }
+  if (-not [string]::IsNullOrWhiteSpace($requestId)) { $exception.Data['gatewaySmokeRequestId'] = $requestId }
+  throw $exception
+}
+
 function Assert-Success($Response, [string]$Name) {
   if ($Response.StatusCode -lt 200 -or $Response.StatusCode -ge 300) {
-    throw "$Name expected HTTP 2xx but received HTTP $($Response.StatusCode)."
+    Throw-ResponseFailure $Response $Name
   }
   Assert-RequestId $Response $Name
   if ($null -eq $Response.Body.data) {
@@ -82,14 +113,14 @@ function Assert-Success($Response, [string]$Name) {
 
 function Assert-Error($Response, [string]$Name, [int]$ExpectedStatus, [string]$ExpectedCode) {
   if ($Response.StatusCode -ne $ExpectedStatus) {
-    throw "$Name expected HTTP $ExpectedStatus but received HTTP $($Response.StatusCode)."
+    Throw-ResponseFailure $Response "$Name (expected HTTP $ExpectedStatus)"
   }
   Assert-RequestId $Response $Name
   if ($null -eq $Response.Body.error) {
     throw "$Name response is missing error."
   }
   if ([string]$Response.Body.error.code -ne $ExpectedCode) {
-    throw "$Name expected error code $ExpectedCode but received $($Response.Body.error.code)."
+    Throw-ResponseFailure $Response "$Name (expected error code $ExpectedCode)"
   }
 }
 
@@ -183,7 +214,22 @@ try {
   Write-Host "Gateway smoke passed: $($checks -join ', ')"
   Write-Host "TrackId: $TrackId"
 } catch {
-  Write-Error $_
+  $code = [string]$_.Exception.Data['gatewaySmokeCode']
+  $requestId = [string]$_.Exception.Data['gatewaySmokeRequestId']
+  if ($code -in @('TRACK_UNAVAILABLE', 'AUTH_REQUIRED')) {
+    $classification = "Expected track classification: $code"
+    if (-not [string]::IsNullOrWhiteSpace($requestId)) { $classification += " (requestId=$requestId)" }
+    if ($AcceptExpectedTrackErrors) {
+      Write-Warning "$classification. Track playback was not verified, but the result was explicitly accepted."
+      if ($checks.Count -gt 0) {
+        Write-Host "Completed with expected classification after: $($checks -join ', ')" -ForegroundColor Yellow
+      }
+      exit 0
+    }
+    Write-Error "$classification. Pass -AcceptExpectedTrackErrors only when this unplayable/auth-required result is intentional."
+  } else {
+    Write-Error $_
+  }
   if ($checks.Count -gt 0) {
     Write-Host "Completed before failure: $($checks -join ', ')" -ForegroundColor Yellow
   }
