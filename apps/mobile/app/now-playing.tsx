@@ -5,6 +5,7 @@ import { Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimens
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/auth';
 import { useTrackLike } from '@/api/hooks';
+import { useReducedMotion } from '@/accessibility';
 import { Artwork, SongRow } from '@/components/music';
 import { Button, EmptyState, IconButton, Screen } from '@/components/ui';
 import { trackFromQueueItem } from '@/player/playbackTypes';
@@ -19,6 +20,7 @@ export default function NowPlayingScreen() {
   const player = usePlayer();
   const auth = useAuth();
   const likeMutation = useTrackLike();
+  const reducedMotion = useReducedMotion();
   const { width } = useWindowDimensions();
   const queue = usePlayerStore((state) => state.queue);
   const currentIndex = usePlayerStore((state) => state.currentIndex);
@@ -188,7 +190,7 @@ export default function NowPlayingScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      <Modal animationType="slide" onRequestClose={() => setQueueOpen(false)} transparent visible={queueOpen}>
+      <Modal animationType={reducedMotion ? 'none' : 'slide'} onRequestClose={() => setQueueOpen(false)} transparent visible={queueOpen}>
         <View style={styles.modalRoot}>
           <Pressable accessibilityLabel="关闭播放队列" onPress={() => setQueueOpen(false)} style={styles.modalBackdrop} />
           <View style={[styles.sheet, { backgroundColor: theme.colors.surface }]}>

@@ -62,6 +62,10 @@ vi.mock('expo-router', () => ({
   useRouter: () => mocks.router,
 }));
 vi.mock('react-native', () => ({
+  AccessibilityInfo: {
+    addEventListener: () => ({ remove: vi.fn() }),
+    isReduceMotionEnabled: async () => false,
+  },
   Modal: 'Modal',
   PanResponder: { create: () => ({ panHandlers: {} }) },
   Pressable: 'Pressable',
