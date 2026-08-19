@@ -43,14 +43,20 @@ git push origin v0.1.0
 - Android：`siplayer-vX.Y.Z-android.apk`，明确使用 APK 格式，可下载到 Android 设备直接安装。
 - iOS：`siplayer-vX.Y.Z-ios.ipa`，使用 Apple store distribution 签名，可下载并提交到 TestFlight/App Store。
 
-首次启用前需要在本地完成一次 EAS 项目初始化和凭据配置：
+首次启用前需要完成 EAS 项目初始化和原生签名凭据配置。下面的本地构建命令只建议每个平台首次运行一次，用于验证配置并让 EAS 按提示创建或保存凭据；之后不需要每次发布都运行。配置完成后，GitHub Actions 会自动执行同样的云构建。
+
+本地执行前，先使用真实的公网 Gateway 地址：
 
 ```powershell
+$env:EXPO_PROJECT_ID = "<Expo/EAS project UUID>"
+$env:EXPO_PUBLIC_GATEWAY_URL = "https://你的-gateway-域名.example.com"
 pnpm dlx eas-cli@latest login
 pnpm dlx eas-cli@latest init
 pnpm dlx eas-cli@latest build --platform android --profile release
 pnpm dlx eas-cli@latest build --platform ios --profile release
 ```
+
+如果 Expo 控制台已经显示该平台有成功的 EAS 构建，或者对应平台的凭据已经配置完成，可以跳过该平台的本地构建。当前发布工作流会同时构建 Android 和 iOS，因此要让 tag 发布完整通过，两个平台的 EAS 凭据都必须可用。
 
 ### GitHub Actions 配置项
 
