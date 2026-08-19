@@ -1,3 +1,4 @@
+import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { usePlaylistDetail } from '@/api/hooks';
@@ -47,30 +48,40 @@ export default function PlaylistDetailScreen() {
     player.setQueue(shuffled.map(queueItemFromTrack), 0);
   };
 
+  const queueItems = playableTracks.map(queueItemFromTrack);
   return (
-    <Screen>
-      <IconButton accessibilityLabel="返回" name="chevron-back" onPress={() => router.back()} />
-      <View style={styles.hero}>
-        <Artwork size={160} title={playlist.name} uri={playlist.artworkUrl} />
-        <View style={styles.heroCopy}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{playlist.name}</Text>
-          <Text style={[styles.meta, { color: theme.colors.textSecondary }]}>{playlist.trackCount ?? playlist.tracks.length} 首歌曲</Text>
-          {playlist.creator?.name ? <Text style={[styles.meta, { color: theme.colors.textSecondary }]}>创建者：{playlist.creator.name}</Text> : null}
-          {playlist.description ? <Text style={[styles.description, { color: theme.colors.textSecondary }]}>{playlist.description}</Text> : null}
-        </View>
-      </View>
-      <View style={styles.actions}>
-        <View style={styles.primaryAction}><Button disabled={playableTracks.length === 0} onPress={() => player.setQueue(playableTracks.map(queueItemFromTrack), 0)}>播放全部</Button></View>
-        <IconButton accessibilityLabel="随机播放歌单" disabled={playableTracks.length === 0} name="shuffle-outline" onPress={shuffle} />
-      </View>
-      <View style={styles.list}>
-        {playlist.tracks.length > 0 ? playlist.tracks.map((track, index) => {
-          const playableIndex = playableTracks.findIndex((item) => item.id === track.id);
-          return <SongRow key={`${track.id}-${index}`} onPress={() => {
-            if (playableIndex >= 0) player.playTrack(queueItemFromTrack(track), { queue: playableTracks.map(queueItemFromTrack), startIndex: playableIndex });
-          }} track={track} />;
-        }) : <EmptyState message="这个歌单暂时没有歌曲。" title="暂无歌曲" />}
-      </View>
+    <Screen contentContainerStyle={styles.screenContent} scroll={false}>
+      <FlashList
+        contentContainerStyle={styles.listContent}
+        data={playlist.tracks}
+        keyExtractor={(track, index) => `${track.id}-${index}`}
+        ListEmptyComponent={<EmptyState message="这个歌单暂时没有歌曲。" title="暂无歌曲" />}
+        ListHeaderComponent={(
+          <>
+            <IconButton accessibilityLabel="返回" name="chevron-back" onPress={() => router.back()} />
+            <View style={styles.hero}>
+              <Artwork size={160} title={playlist.name} uri={playlist.artworkUrl} />
+              <View style={styles.heroCopy}>
+                <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{playlist.name}</Text>
+                <Text style={[styles.meta, { color: theme.colors.textSecondary }]}>{playlist.trackCount ?? playlist.tracks.length} 首歌曲</Text>
+                {playlist.creator?.name ? <Text style={[styles.meta, { color: theme.colors.textSecondary }]}>创建者：{playlist.creator.name}</Text> : null}
+                {playlist.description ? <Text style={[styles.description, { color: theme.colors.textSecondary }]}>{playlist.description}</Text> : null}
+              </View>
+            </View>
+            <View style={styles.actions}>
+              <View style={styles.primaryAction}><Button disabled={queueItems.length === 0} onPress={() => player.setQueue(queueItems, 0)}>播放全部</Button></View>
+              <IconButton accessibilityLabel="随机播放歌单" disabled={queueItems.length === 0} name="shuffle-outline" onPress={shuffle} />
+            </View>
+          </>
+        )}
+        renderItem={({ item }) => {
+          const playableIndex = playableTracks.findIndex((track) => track.id === item.id);
+          return <SongRow onPress={() => {
+            if (playableIndex >= 0) player.playTrack(queueItemFromTrack(item), { queue: queueItems, startIndex: playableIndex });
+          }} track={item} />;
+        }}
+        showsVerticalScrollIndicator={false}
+      />
     </Screen>
   );
 }
@@ -85,4 +96,6 @@ const styles = StyleSheet.create({
   actions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
   primaryAction: { flex: 1 },
   list: { marginTop: 20 },
+  screenContent: { paddingHorizontal: 0, paddingBottom: 0 },
+  listContent: { paddingBottom: 48, paddingHorizontal: 20 },
 });

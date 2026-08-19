@@ -2,6 +2,7 @@ import type { AudioQuality, CatalogSearchPage, Lyrics, PlaylistCollections, Play
 import { NeteaseApiClient } from './client';
 import { neteaseEndpoints } from './endpoints';
 import { NeteaseProviderError } from './errors';
+import { chunkArray, orderByIds } from './batching';
 import {
   RawLikeListResponseSchema,
   RawLoginStatusResponseSchema,
@@ -22,6 +23,8 @@ import {
   mapStream,
 } from './mapper';
 import {
+  type RawPrivilege,
+  type RawSong,
   RawLyricsResponseSchema,
   RawPlaylistDetailResponseSchema,
   RawPlaylistTracksResponseSchema,
@@ -51,6 +54,8 @@ export interface AuthProvider {
 
 export class NeteaseProvider implements ContentProvider, AuthProvider {
   private readonly client: NeteaseApiClient;
+  private static readonly maxPlaylistTracks = 500;
+  private static readonly detailBatchSize = 100;
 
   constructor(options: ConstructorParameters<typeof NeteaseApiClient>[0]) {
     this.client = new NeteaseApiClient(options);
@@ -101,16 +106,22 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
       { id },
       (payload) => RawPlaylistDetailResponseSchema.parse(payload),
     );
-    let songs = raw.playlist.tracks;
-    const expectedCount = Math.min(raw.playlist.trackCount ?? raw.playlist.trackIds.length, 500);
-    if (songs.length < expectedCount && raw.playlist.trackIds.length > 0) {
-      const all = await this.client.get(
-        neteaseEndpoints.playlistTracks,
-        { id, limit: expectedCount, offset: 0 },
-        (payload) => RawPlaylistTracksResponseSchema.parse(payload),
-      );
-      songs = all.songs;
+    const expectedCount = Math.min(raw.playlist.trackCount ?? raw.playlist.trackIds.length, NeteaseProvider.maxPlaylistTracks);
+    const expectedIds = raw.playlist.trackIds.slice(0, expectedCount).map((track) => track.id);
+    const songsById = new Map(raw.playlist.tracks.map((song) => [song.id, song]));
+    if (expectedIds.length > songsById.size) {
+      for (const [offset, batch] of chunkArray(expectedIds, NeteaseProvider.detailBatchSize).entries()) {
+        const all = await this.client.get(
+          neteaseEndpoints.playlistTracks,
+          { id, limit: batch.length, offset: offset * NeteaseProvider.detailBatchSize },
+          (payload) => RawPlaylistTracksResponseSchema.parse(payload),
+        );
+        for (const song of all.songs) songsById.set(song.id, song);
+      }
     }
+    const songs = expectedIds.length > 0
+      ? orderByIds(expectedIds, [...songsById.values()])
+      : expectedCount > 0 ? raw.playlist.tracks.slice(0, expectedCount) : raw.playlist.tracks;
     const tracks = songs.map((song) => mapDetailTrack(song, song.privilege));
     return mapPlaylist(raw.playlist, tracks);
   }
@@ -230,14 +241,21 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
       cookie,
     );
     if (idsResponse.ids.length === 0) return [];
-    const detail = await this.client.get(
-      neteaseEndpoints.trackDetail,
-      { ids: idsResponse.ids.join(',') },
-      (payload) => RawTrackDetailResponseSchema.parse(payload),
-      cookie,
-    );
-    const privileges = new Map(detail.privileges.map((privilege) => [privilege.id, privilege]));
-    return detail.songs.map((song) => mapDetailTrack(song, privileges.get(song.id)));
+    const songsById = new Map<string, { song: RawSong; privilege?: RawPrivilege }>();
+    for (const ids of chunkArray(idsResponse.ids, NeteaseProvider.detailBatchSize)) {
+      const detail = await this.client.get(
+        neteaseEndpoints.trackDetail,
+        { ids: ids.join(',') },
+        (payload) => RawTrackDetailResponseSchema.parse(payload),
+        cookie,
+      );
+      const privileges = new Map(detail.privileges.map((privilege) => [privilege.id, privilege]));
+      for (const song of detail.songs) songsById.set(song.id, { song, privilege: privileges.get(song.id) });
+    }
+    return idsResponse.ids.flatMap((id) => {
+      const item = songsById.get(id);
+      return item ? [mapDetailTrack(item.song, item.privilege)] : [];
+    });
   }
 
   async setTrackLiked(trackId: string, liked: boolean, cookie: string): Promise<boolean> {
