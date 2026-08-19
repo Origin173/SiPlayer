@@ -2,13 +2,13 @@ import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { SearchType } from '@siplayer/contracts';
+import type { SearchType, Track } from '@siplayer/contracts';
 import { useCatalogSearch, useTrackSearch } from '@/api/hooks';
 import { CatalogRow, SongRow } from '@/components/music';
 import { Button, ErrorState, Screen, SearchField, Skeleton } from '@/components/ui';
 import { loadSearchHistory, recordSearchKeyword } from '@/features/searchHistory';
+import { createSearchPlaySelection } from '@/features/searchPlayback';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { queueItemFromTrack } from '@/player/playbackTypes';
 import { usePlayer } from '@/player';
 import { useTheme } from '@/theme';
 
@@ -29,8 +29,12 @@ export default function SearchScreen() {
   );
   const results = trackSearch.data?.pages.flatMap((page) => page.items) ?? [];
   const catalogItems = catalogSearch.data?.pages.flatMap((page) => page.items) ?? [];
-  const queueItems = results.map(queueItemFromTrack);
   const activeSearch = searchType === 'track' ? trackSearch : catalogSearch;
+  const playSearchTrack = (track: Track) => {
+    const selection = createSearchPlaySelection(results, track.id);
+    if (!selection) return;
+    player.playTrack(selection.item, { queue: selection.queue, startIndex: selection.startIndex });
+  };
   const isDebouncing = submittedKeyword !== debouncedSubmittedKeyword;
 
   useEffect(() => {
@@ -120,7 +124,7 @@ export default function SearchScreen() {
           if (trackSearch.hasNextPage && !trackSearch.isFetchingNextPage) void trackSearch.fetchNextPage();
         }}
         onEndReachedThreshold={0.5}
-        renderItem={({ item, index }) => <SongRow onPress={() => player.playTrack(queueItemFromTrack(item), { queue: queueItems, startIndex: index })} track={item} />}
+        renderItem={({ item }) => <SongRow onPress={() => playSearchTrack(item)} track={item} />}
         showsVerticalScrollIndicator={false}
       />
     </Screen>

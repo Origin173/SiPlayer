@@ -416,3 +416,27 @@ MVP 真正 release gate：
 
 如果都不是，默认不进入核心版本。
 
+# Current Implementation Checkpoint
+
+当前仓库已经从“功能拼装”进入 **MVP 候选版稳定性收口** 阶段。代码审查中提出的几项明确回归已经在后续实现中处理：
+
+- 队列行同时保留上移/下移与移除操作。
+- 设置写入通过串行队列合并，避免并发字段丢失。
+- 歌曲、专辑、歌手和歌单搜索均支持继续加载分页结果。
+- `/ready` 会校验上游 HTTP 状态；Gateway 代理信任和 session 持久化失败具备显式配置/日志边界。
+- Now Playing、歌手详情和队列弹层使用列表虚拟化，降低大数据量渲染压力。
+
+本轮继续推进 Phase 3 / Phase 7 的稳定性工作：
+
+- 将 stream resolve → metadata → play 生命周期抽成可单测的运行时协调器。
+- 旧请求完成时不再覆盖新歌曲；暂停 resolve 中的歌曲会使请求失效。
+- 旧歌曲的音频 `error` / `didJustFinish` 状态不会被新歌曲消费。
+- Provider 卸载或暂停时，未完成的 stream resolve 不会再触碰音频实例。
+- 设置 hydration 不会覆盖用户在加载期间刚选择的音质/播放模式。
+- 增加播放器运行时、Provider 组件、stream resolver 和 player store 回归测试。
+- Search → Play 只把可播放歌曲放入队列，并按过滤后的队列重新计算选中索引，避免不可播放结果造成切歌偏移；Search screen 已有结果点击、分页追加、错误重试的集成契约测试。
+- Now Playing 使用显式 `playQueueIndex` 语义点选队列歌曲，不再把 `setQueue` 当作隐式播放 API。
+- `AuthProvider` 覆盖 session hydration、过期清理、QR 授权、logout 和卸载后的异步完成保护。
+
+下一道可验证门槛：固定 `api-enhanced` 版本执行 Gateway smoke，并进入 iOS/Android Development Build 的真实验收矩阵。不可用的上游或系统能力必须在 QA 文档中记录为未验证，而不是以静态代码推断通过。
+

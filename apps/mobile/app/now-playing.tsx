@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { FlashList } from '@shopify/flash-list';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/auth';
 import { useTrackLike } from '@/api/hooks';
@@ -82,103 +83,110 @@ export default function NowPlayingScreen() {
   }
 
   return (
-    <Screen contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <IconButton accessibilityLabel="关闭正在播放" name="chevron-down" onPress={() => router.back()} />
-        <Text style={[styles.headerTitle, { color: theme.colors.textSecondary }]}>正在播放</Text>
-        <View style={styles.headerSpace} />
-      </View>
+    <Screen contentContainerStyle={styles.screenContent} scroll={false}>
+      <FlashList
+        contentContainerStyle={styles.listContent}
+        data={queue}
+        keyExtractor={(item, index) => `${item.trackId}-${index}`}
+        ListFooterComponent={<Text style={[styles.sourceNote, { color: theme.colors.textTertiary }]}>播放地址由 Gateway 临时解析，不会写入队列</Text>}
+        ListHeaderComponent={(
+          <>
+            <View style={styles.header}>
+              <IconButton accessibilityLabel="关闭正在播放" name="chevron-down" onPress={() => router.back()} />
+              <Text style={[styles.headerTitle, { color: theme.colors.textSecondary }]}>正在播放</Text>
+              <View style={styles.headerSpace} />
+            </View>
 
-      <View style={styles.artworkWrap}>
-        <Artwork size={artworkSize} title={current.title} uri={current.artworkUrl} />
-      </View>
-      <View style={styles.trackCopy}>
-        <Text numberOfLines={2} style={[styles.trackTitle, { color: theme.colors.textPrimary }]}>{current.title}</Text>
-        <Text numberOfLines={1} style={[styles.artist, { color: theme.colors.textSecondary }]}>{current.artistText}</Text>
-      </View>
+            <View style={styles.artworkWrap}>
+              <Artwork size={artworkSize} title={current.title} uri={current.artworkUrl} />
+            </View>
+            <View style={styles.trackCopy}>
+              <Text numberOfLines={2} style={[styles.trackTitle, { color: theme.colors.textPrimary }]}>{current.title}</Text>
+              <Text numberOfLines={1} style={[styles.artist, { color: theme.colors.textSecondary }]}>{current.artistText}</Text>
+            </View>
 
-      {hasPlaybackError ? (
-        <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.playbackError, { backgroundColor: theme.colors.dangerSoft }]}>
-          <Text style={[styles.playbackErrorTitle, { color: theme.colors.danger }]}>{playbackErrorMessage}</Text>
-          <Button onPress={player.play} variant="text">重试播放</Button>
-        </View>
-      ) : null}
+            {hasPlaybackError ? (
+              <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.playbackError, { backgroundColor: theme.colors.dangerSoft }]}>
+                <Text style={[styles.playbackErrorTitle, { color: theme.colors.danger }]}>{playbackErrorMessage}</Text>
+                <Button onPress={player.play} variant="text">重试播放</Button>
+              </View>
+            ) : null}
 
-      <View style={styles.progressWrap}>
-        <View
-          accessible
-          accessibilityLabel={`播放进度 ${formatTime(displayedPositionMs)} / ${formatTime(durationMs)}`}
-          accessibilityRole="adjustable"
-          accessibilityValue={{ max: durationMs, min: 0, now: displayedPositionMs }}
-          onLayout={(event) => setProgressWidth(event.nativeEvent.layout.width)}
-          style={styles.progressTouchArea}
-          {...progressResponder.panHandlers}
-        >
-          <View pointerEvents="none" style={[styles.progressHitArea, { backgroundColor: theme.colors.surfaceMuted }]}>
-            <View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${displayedProgress * 100}%` }]} />
-          </View>
-        </View>
-        <View style={styles.timeRow}>
-          <Text style={[styles.time, { color: theme.colors.textSecondary }]}>{formatTime(displayedPositionMs)}</Text>
-          <Text style={[styles.time, { color: theme.colors.textSecondary }]}>{formatTime(durationMs)}</Text>
-        </View>
-      </View>
+            <View style={styles.progressWrap}>
+              <View
+                accessible
+                accessibilityLabel={`播放进度 ${formatTime(displayedPositionMs)} / ${formatTime(durationMs)}`}
+                accessibilityRole="adjustable"
+                accessibilityValue={{ max: durationMs, min: 0, now: displayedPositionMs }}
+                onLayout={(event) => setProgressWidth(event.nativeEvent.layout.width)}
+                style={styles.progressTouchArea}
+                {...progressResponder.panHandlers}
+              >
+                <View pointerEvents="none" style={[styles.progressHitArea, { backgroundColor: theme.colors.surfaceMuted }]}>
+                  <View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${displayedProgress * 100}%` }]} />
+                </View>
+              </View>
+              <View style={styles.timeRow}>
+                <Text style={[styles.time, { color: theme.colors.textSecondary }]}>{formatTime(displayedPositionMs)}</Text>
+                <Text style={[styles.time, { color: theme.colors.textSecondary }]}>{formatTime(durationMs)}</Text>
+              </View>
+            </View>
 
-      <View style={styles.primaryControls}>
-        <IconButton accessibilityLabel="上一首" iconSize={30} name="play-skip-back" onPress={player.previous} size={52} />
-        <Pressable
-          accessibilityLabel={isPlaying ? '暂停' : '播放'}
-          accessibilityRole="button"
-          onPress={isPlaying ? player.pause : player.play}
-          style={({ pressed }) => [styles.playButton, { backgroundColor: theme.colors.primary, opacity: pressed ? 0.86 : 1 }]}
-        >
-          <Ionicons color={theme.colors.textOnPrimary} name={isPlaying ? 'pause' : 'play'} size={30} />
-        </Pressable>
-        <IconButton accessibilityLabel="下一首" iconSize={30} name="play-skip-forward" onPress={player.next} size={52} />
-      </View>
+            <View style={styles.primaryControls}>
+              <IconButton accessibilityLabel="上一首" iconSize={30} name="play-skip-back" onPress={player.previous} size={52} />
+              <Pressable
+                accessibilityLabel={isPlaying ? '暂停' : '播放'}
+                accessibilityRole="button"
+                onPress={isPlaying ? player.pause : player.play}
+                style={({ pressed }) => [styles.playButton, { backgroundColor: theme.colors.primary, opacity: pressed ? 0.86 : 1 }]}
+              >
+                <Ionicons color={theme.colors.textOnPrimary} name={isPlaying ? 'pause' : 'play'} size={30} />
+              </Pressable>
+              <IconButton accessibilityLabel="下一首" iconSize={30} name="play-skip-forward" onPress={player.next} size={52} />
+            </View>
 
-      <View style={styles.secondaryControls}>
-        <IconButton accessibilityLabel={`切换播放模式，当前${modeLabel}`} name={modeIcon} onPress={cycleMode} />
-        <IconButton
-          accessibilityLabel={liked ? '取消喜欢' : '喜欢这首歌'}
-          color={liked ? theme.colors.primary : undefined}
-          disabled={likeMutation.isPending}
-          name={liked ? 'heart' : 'heart-outline'}
-          onPress={() => {
-            if (!auth.isAuthenticated) {
-              router.push('/login');
-              return;
-            }
-            const nextLiked = !liked;
-            setLiked(nextLiked);
-            likeMutation.mutate({ liked: nextLiked, trackId: current.trackId }, { onError: () => setLiked(liked) });
-          }}
-        />
-        <IconButton accessibilityLabel="查看歌词" name="text-outline" onPress={() => router.push('/lyrics')} />
-        <IconButton accessibilityLabel="打开播放队列" name="list-outline" onPress={() => setQueueOpen(true)} />
-      </View>
+            <View style={styles.secondaryControls}>
+              <IconButton accessibilityLabel={`切换播放模式，当前${modeLabel}`} name={modeIcon} onPress={cycleMode} />
+              <IconButton
+                accessibilityLabel={liked ? '取消喜欢' : '喜欢这首歌'}
+                color={liked ? theme.colors.primary : undefined}
+                disabled={likeMutation.isPending}
+                name={liked ? 'heart' : 'heart-outline'}
+                onPress={() => {
+                  if (!auth.isAuthenticated) {
+                    router.push('/login');
+                    return;
+                  }
+                  const nextLiked = !liked;
+                  setLiked(nextLiked);
+                  likeMutation.mutate({ liked: nextLiked, trackId: current.trackId }, { onError: () => setLiked(liked) });
+                }}
+              />
+              <IconButton accessibilityLabel="查看歌词" name="text-outline" onPress={() => router.push('/lyrics')} />
+              <IconButton accessibilityLabel="打开播放队列" name="list-outline" onPress={() => setQueueOpen(true)} />
+            </View>
 
-      <View style={[styles.queueHeader, { borderTopColor: theme.colors.divider }]}>
-        <Text style={[styles.queueTitle, { color: theme.colors.textPrimary }]}>播放队列</Text>
-        <View style={styles.queueActions}>
-          <Text style={[styles.queueCount, { color: theme.colors.textSecondary }]}>{queue.length} 首</Text>
-          {currentIndex < queue.length - 1 ? <Pressable accessibilityLabel="清空后续歌曲" accessibilityRole="button" onPress={player.clearNext}><Text style={[styles.clearNext, { color: theme.colors.primary }]}>清空后续</Text></Pressable> : null}
-        </View>
-      </View>
-      <ScrollView scrollEnabled={false}>
-        {queue.map((item, index) => (
+            <View style={[styles.queueHeader, { borderTopColor: theme.colors.divider }]}>
+              <Text style={[styles.queueTitle, { color: theme.colors.textPrimary }]}>播放队列</Text>
+              <View style={styles.queueActions}>
+                <Text style={[styles.queueCount, { color: theme.colors.textSecondary }]}>{queue.length} 首</Text>
+                {currentIndex < queue.length - 1 ? <Pressable accessibilityLabel="清空后续歌曲" accessibilityRole="button" onPress={player.clearNext}><Text style={[styles.clearNext, { color: theme.colors.primary }]}>清空后续</Text></Pressable> : null}
+              </View>
+            </View>
+          </>
+        )}
+        renderItem={({ item, index }) => (
           <SongRow
-            key={`${item.trackId}-${index}`}
             isCurrent={index === currentIndex}
-            onPress={() => player.setQueue(queue, index)}
+            onPress={() => player.playQueueIndex(index)}
             onRemove={index === currentIndex ? undefined : () => player.removeFromQueue(index)}
             onMoveUp={index > 0 ? () => player.reorderQueue(index, index - 1) : undefined}
             onMoveDown={index < queue.length - 1 ? () => player.reorderQueue(index, index + 1) : undefined}
             track={trackFromQueueItem(item)}
           />
-        ))}
-      </ScrollView>
-      <Text style={[styles.sourceNote, { color: theme.colors.textTertiary }]}>播放地址由 Gateway 临时解析，不会写入队列</Text>
+        )}
+        showsVerticalScrollIndicator={false}
+      />
 
       <Modal animationType="slide" onRequestClose={() => setQueueOpen(false)} transparent visible={queueOpen}>
         <View style={styles.modalRoot}>
@@ -189,19 +197,22 @@ export default function NowPlayingScreen() {
               <Text style={[styles.queueTitle, { color: theme.colors.textPrimary }]}>播放队列</Text>
               <IconButton accessibilityLabel="关闭播放队列" name="close" onPress={() => setQueueOpen(false)} />
             </View>
-            <ScrollView>
-              {queue.map((item, index) => (
+            <FlashList
+              contentContainerStyle={styles.modalListContent}
+              data={queue}
+              keyExtractor={(item, index) => `sheet-${item.trackId}-${index}`}
+              renderItem={({ item, index }) => (
                 <SongRow
-                  key={`sheet-${item.trackId}-${index}`}
                   isCurrent={index === currentIndex}
-                  onPress={() => { setQueueOpen(false); player.setQueue(queue, index); }}
+                  onPress={() => { setQueueOpen(false); player.playQueueIndex(index); }}
                   onRemove={index === currentIndex ? undefined : () => player.removeFromQueue(index)}
                   onMoveUp={index > 0 ? () => player.reorderQueue(index, index - 1) : undefined}
                   onMoveDown={index < queue.length - 1 ? () => player.reorderQueue(index, index + 1) : undefined}
                   track={trackFromQueueItem(item)}
                 />
-              ))}
-            </ScrollView>
+              )}
+              showsVerticalScrollIndicator={false}
+            />
           </View>
         </View>
       </Modal>
@@ -210,7 +221,8 @@ export default function NowPlayingScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { alignItems: 'stretch' },
+  screenContent: { paddingHorizontal: 0, paddingBottom: 0 },
+  listContent: { paddingBottom: 48, paddingHorizontal: 20 },
   header: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   headerTitle: { fontSize: 13, fontWeight: '600' },
   headerSpace: { height: 44, width: 44 },
@@ -240,4 +252,5 @@ const styles = StyleSheet.create({
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%', paddingBottom: 24, paddingHorizontal: 16, paddingTop: 10 },
   dragIndicator: { alignSelf: 'center', backgroundColor: '#A5A5A5', borderRadius: 999, height: 4, marginBottom: 8, width: 36 },
   sheetHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  modalListContent: { paddingBottom: 8 },
 });
