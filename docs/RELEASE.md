@@ -119,6 +119,15 @@ git tag v0.1.0-alpha.2
 git push origin v0.1.0-alpha.2
 ```
 
+### 复用已经完成的构建产物
+
+如果质量检查和 Android EAS 构建已经成功，但 `publish` job 因工作流问题失败，不要重新创建 tag 或重新构建。先将修复后的工作流推送到默认分支，然后在 GitHub 的 Actions → Release → Run workflow 中填写：
+
+- `release_tag`：原来的 tag，例如 `v0.1.0-alpha.1`。
+- `source_run_id`：原失败 workflow 的数字 run ID，即 Actions 运行页面 URL 中 `/actions/runs/` 后面的数字，不是 EAS build ID。
+
+这个手动入口会从原 workflow run 下载 `release-package-*`、`release-notes-*` 和 `native-android-*` artifacts，重新上传到同一个 GitHub Release，并更新 changelog。Artifacts 默认只保留 14 天；如果已经过期，就必须重新运行完整构建。
+
 EAS 负责保存 Android keystore；不要把证书、私钥或 token 提交到仓库。GitHub Actions 只通过 `EXPO_TOKEN` 触发 Android 云构建。
 
 注意：Android APK 可以直接下载安装（设备可能需要允许安装未知来源应用）。普通 iOS 用户不能仅凭下载的 IPA 直接安装；IPA 必须通过 TestFlight/App Store，或使用 Ad Hoc/Enterprise 签名并满足 Apple 的设备注册/企业分发条件。这是 Apple 的分发限制，不是 CI 能绕过的限制。
