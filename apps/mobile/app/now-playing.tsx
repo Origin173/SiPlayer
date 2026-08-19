@@ -96,10 +96,12 @@ export default function NowPlayingScreen() {
           accessibilityRole="adjustable"
           accessibilityValue={{ max: durationMs, min: 0, now: displayedPositionMs }}
           onLayout={(event) => setProgressWidth(event.nativeEvent.layout.width)}
-          style={[styles.progressHitArea, { backgroundColor: theme.colors.surfaceMuted }]}
+          style={styles.progressTouchArea}
           {...progressResponder.panHandlers}
         >
-          <View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${displayedProgress * 100}%` }]} />
+          <View pointerEvents="none" style={[styles.progressHitArea, { backgroundColor: theme.colors.surfaceMuted }]}>
+            <View style={[styles.progressFill, { backgroundColor: theme.colors.primary, width: `${displayedProgress * 100}%` }]} />
+          </View>
         </View>
         <View style={styles.timeRow}>
           <Text style={[styles.time, { color: theme.colors.textSecondary }]}>{formatTime(displayedPositionMs)}</Text>
@@ -198,6 +200,7 @@ const styles = StyleSheet.create({
   trackTitle: { fontSize: 24, fontWeight: '700', lineHeight: 30, textAlign: 'center' },
   artist: { fontSize: 15, marginTop: 6 },
   progressWrap: { marginTop: 28 },
+  progressTouchArea: { justifyContent: 'center', minHeight: 32 },
   progressHitArea: { borderRadius: 999, height: 8, justifyContent: 'center', overflow: 'hidden' },
   progressFill: { borderRadius: 999, height: '100%' },
   timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
