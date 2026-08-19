@@ -36,7 +36,7 @@ export function MiniPlayer() {
         name={hasPlaybackError ? 'refresh' : isPlaying ? 'pause' : 'play'}
         onPress={hasPlaybackError || !isPlaying ? player.play : player.pause}
       />
-      <IconButton accessibilityLabel="打开播放队列" iconSize={22} name="list-outline" onPress={() => router.push('/now-playing')} />
+      <IconButton accessibilityLabel="打开播放队列" iconSize={22} name="list-outline" onPress={() => router.push({ pathname: '/now-playing', params: { queue: '1' } })} />
       {isPlaying ? <View style={[styles.progress, { backgroundColor: theme.colors.primary }]} /> : null}
     </View>
   );

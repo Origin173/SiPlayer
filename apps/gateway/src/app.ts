@@ -69,7 +69,7 @@ export function buildApp(
     }
     reply
       .header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-      .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      .header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
       .header('Access-Control-Max-Age', '600');
     if (request.method === 'OPTIONS') return reply.status(204).send();
   });

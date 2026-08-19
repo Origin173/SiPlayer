@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/auth';
@@ -14,6 +14,7 @@ import { formatTime } from '@/utils/formatTime';
 export default function NowPlayingScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const { queue: queueParam } = useLocalSearchParams<{ queue?: string }>();
   const player = usePlayer();
   const auth = useAuth();
   const likeMutation = useTrackLike();
@@ -28,6 +29,9 @@ export default function NowPlayingScreen() {
   const [liked, setLiked] = useState(current?.track?.liked ?? false);
   const [queueOpen, setQueueOpen] = useState(false);
   useEffect(() => setLiked(current?.track?.liked ?? false), [current?.track?.liked, current?.trackId]);
+  useEffect(() => {
+    if (queueParam === '1') setQueueOpen(true);
+  }, [queueParam]);
   const artworkSize = Math.min(Math.max(width - 64, 240), 360);
   const isPlaying = playbackState === 'playing';
   const hasPlaybackError = playbackState === 'error' || playbackState === 'unavailable';

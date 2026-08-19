@@ -24,6 +24,8 @@ describe('gateway foundation routes', () => {
     expect(response.statusCode).toBe(204);
     expect(response.headers['access-control-allow-origin']).toBe('*');
     expect(response.headers['access-control-allow-headers']).toContain('Authorization');
+    expect(response.headers['access-control-allow-methods']).toContain('PUT');
+    expect(response.headers['access-control-allow-methods']).toContain('DELETE');
   });
 
   it('restricts CORS to configured origins', async () => {
