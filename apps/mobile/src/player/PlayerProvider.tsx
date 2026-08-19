@@ -259,7 +259,6 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       if (index === state.currentIndex) {
         const nextItem = nextQueue[Math.max(nextIndex, 0)];
         if (nextItem) void resolveAndPlay(nextItem);
-      } else {
       }
     },
     [audioPlayer, clear, mutateQueue, resolveAndPlay],
