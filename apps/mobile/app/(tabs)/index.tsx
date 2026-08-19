@@ -80,6 +80,8 @@ export default function HomeScreen() {
       </View>
       {!auth.isAuthenticated ? (
         <EmptyState message="登录后可以同步创建和收藏的歌单。" onAction={() => router.push('/login')} actionLabel="扫码登录" title="登录后查看歌单" />
+      ) : playlistsQuery.isError ? (
+        <ErrorState onRetry={() => void playlistsQuery.refetch()} />
       ) : playlistsQuery.isPending ? (
         <ScrollView contentContainerStyle={styles.playlists} horizontal showsHorizontalScrollIndicator={false}><Skeleton height={190} width={148} /><Skeleton height={190} width={148} /></ScrollView>
       ) : playlists.length > 0 ? (
