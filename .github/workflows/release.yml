@@ -135,13 +135,16 @@ jobs:
           fi
 
       - name: Inject public runtime configuration into EAS profile
+        working-directory: apps/mobile
         run: |
           node --input-type=module -e "import fs from 'node:fs'; const path = 'eas.json'; const config = JSON.parse(fs.readFileSync(path, 'utf8')); config.build.release.env = { ...(config.build.release.env ?? {}), EXPO_PUBLIC_GATEWAY_URL: process.env.EXPO_PUBLIC_GATEWAY_URL }; fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\\n');"
 
       - name: Validate EAS project configuration
+        working-directory: apps/mobile
         run: eas config --platform "${{ matrix.platform }}" --profile release --non-interactive
 
       - name: Build signed native binary on EAS
+        working-directory: apps/mobile
         run: |
           eas build \
             --platform "${{ matrix.platform }}" \

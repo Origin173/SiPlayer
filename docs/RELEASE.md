@@ -45,9 +45,13 @@ git push origin v0.1.0
 
 首次启用前需要完成 EAS 项目初始化和原生签名凭据配置。下面的本地构建命令只建议每个平台首次运行一次，用于验证配置并让 EAS 按提示创建或保存凭据；之后不需要每次发布都运行。配置完成后，GitHub Actions 会自动执行同样的云构建。
 
+SiPlayer 是 pnpm monorepo，Expo App 根目录是 `apps/mobile`。EAS 命令必须从该目录执行，`apps/mobile/eas.json` 也必须保留在该目录；不要从仓库根目录执行 EAS 命令。
+
 本地执行前，先使用真实的公网 Gateway 地址：
 
 ```powershell
+$repoRoot = "D:\Code\SiPlayer"
+Set-Location "$repoRoot\apps\mobile"
 $env:EXPO_PROJECT_ID = "<Expo/EAS project UUID>"
 $env:EXPO_PUBLIC_GATEWAY_URL = "https://你的-gateway-域名.example.com"
 pnpm dlx eas-cli@latest login
