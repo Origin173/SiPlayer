@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import searchFixture from './fixtures/search.json';
 import lyricsFixture from './fixtures/lyrics.json';
 import streamFixture from './fixtures/stream.json';
-import { mapLyrics, mapSearchResponse, mapStream, parseLrc } from './mapper';
+import { mapCatalogSearchResponse, mapLyrics, mapSearchResponse, mapStream, parseLrc } from './mapper';
 import { RawLyricsResponseSchema, RawSearchResponseSchema, RawStreamResponseSchema } from './rawTypes';
 import type { AudioQuality } from '@siplayer/contracts';
 
@@ -19,6 +19,20 @@ describe('netease mapper', () => {
       playable: true,
     });
     expect(page.items[0]?.album?.artworkUrl).toBe('https://example.com/album.png');
+  });
+
+  it('maps catalog search results by requested type', () => {
+    const raw = RawSearchResponseSchema.parse({
+      code: 200,
+      result: {
+        albumCount: 1,
+        albums: [{ id: 9, name: 'Quiet Album', picUrl: 'https://example.com/album.png', artists: [{ id: 7, name: 'Origin' }] }],
+      },
+    });
+    const page = mapCatalogSearchResponse(raw, 'album', 1, 30);
+
+    expect(page).toMatchObject({ type: 'album', hasMore: false });
+    expect(page.items[0]).toMatchObject({ id: '9', name: 'Quiet Album' });
   });
 
   it('parses and merges translated lyrics once at the adapter boundary', () => {
