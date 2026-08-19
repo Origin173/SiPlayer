@@ -172,6 +172,8 @@ export default function NowPlayingScreen() {
             isCurrent={index === currentIndex}
             onPress={() => player.setQueue(queue, index)}
             onRemove={index === currentIndex ? undefined : () => player.removeFromQueue(index)}
+            onMoveUp={index > 0 ? () => player.reorderQueue(index, index - 1) : undefined}
+            onMoveDown={index < queue.length - 1 ? () => player.reorderQueue(index, index + 1) : undefined}
             track={trackFromQueueItem(item)}
           />
         ))}
@@ -194,6 +196,8 @@ export default function NowPlayingScreen() {
                   isCurrent={index === currentIndex}
                   onPress={() => { setQueueOpen(false); player.setQueue(queue, index); }}
                   onRemove={index === currentIndex ? undefined : () => player.removeFromQueue(index)}
+                  onMoveUp={index > 0 ? () => player.reorderQueue(index, index - 1) : undefined}
+                  onMoveDown={index < queue.length - 1 ? () => player.reorderQueue(index, index + 1) : undefined}
                   track={trackFromQueueItem(item)}
                 />
               ))}

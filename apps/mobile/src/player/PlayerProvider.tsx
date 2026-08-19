@@ -21,6 +21,7 @@ export interface PlayerController {
   addNext: (item: QueueItem) => void;
   addToQueue: (item: QueueItem) => void;
   removeFromQueue: (index: number) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
   clearNext: () => void;
   clearQueue: () => void;
   setMode: (mode: PlaybackMode) => void;
@@ -33,6 +34,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const audioPlayer = useAudioPlayer(null, { updateInterval: 500, keepAudioSessionActive: true });
   const audioStatus = useAudioPlayerStatus(audioPlayer);
   const setQueue = usePlayerStore((state) => state.setQueue);
+  const reorderQueue = usePlayerStore((state) => state.reorderQueue);
   const setPlaybackState = usePlayerStore((state) => state.setPlaybackState);
   const setPlaybackMode = usePlayerStore((state) => state.setPlaybackMode);
   const setPlaybackQuality = usePlayerStore((state) => state.setQuality);
@@ -302,12 +304,13 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       addNext,
       addToQueue,
       removeFromQueue,
+      reorderQueue,
       clearNext,
       clearQueue,
       setMode,
       setQuality,
     }),
-    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, seekTo, setMode, setPlayerQueue, setQuality, toggle],
+    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, reorderQueue, seekTo, setMode, setPlayerQueue, setQuality, toggle],
   );
 
   return <PlayerContext.Provider value={controller}>{children}</PlayerContext.Provider>;

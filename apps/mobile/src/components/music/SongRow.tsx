@@ -8,10 +8,12 @@ interface SongRowProps {
   track: Track;
   onPress?: () => void;
   onRemove?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   isCurrent?: boolean;
 }
 
-export function SongRow({ track, onPress, onRemove, isCurrent = false }: SongRowProps) {
+export function SongRow({ track, onPress, onRemove, onMoveUp, onMoveDown, isCurrent = false }: SongRowProps) {
   const { theme } = useTheme();
   const disabled = !track.playable;
 
@@ -38,7 +40,12 @@ export function SongRow({ track, onPress, onRemove, isCurrent = false }: SongRow
       </View>
       <View style={styles.trailing}>
         {isCurrent ? <Ionicons color={theme.colors.primary} name="volume-high-outline" size={20} /> : null}
-        {onRemove ? (
+        {onMoveUp || onMoveDown ? (
+          <View style={styles.reorderButtons}>
+            {onMoveUp ? <Pressable accessibilityLabel={`上移 ${track.name}`} accessibilityRole="button" hitSlop={6} onPress={onMoveUp}><Ionicons color={theme.colors.textSecondary} name="chevron-up" size={18} /></Pressable> : null}
+            {onMoveDown ? <Pressable accessibilityLabel={`下移 ${track.name}`} accessibilityRole="button" hitSlop={6} onPress={onMoveDown}><Ionicons color={theme.colors.textSecondary} name="chevron-down" size={18} /></Pressable> : null}
+          </View>
+        ) : onRemove ? (
           <Pressable accessibilityLabel={`从队列移除 ${track.name}`} accessibilityRole="button" hitSlop={8} onPress={onRemove}>
             <Ionicons color={theme.colors.textTertiary} name="close-circle-outline" size={21} />
           </Pressable>
@@ -55,4 +62,5 @@ const styles = StyleSheet.create({
   meta: { fontSize: 12, lineHeight: 18, marginTop: 2 },
   unavailable: { fontSize: 11, lineHeight: 15, marginTop: 1 },
   trailing: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  reorderButtons: { alignItems: 'center', flexDirection: 'row', gap: 2 },
 });
