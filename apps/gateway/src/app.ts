@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance, type FastifyReply, type FastifyServerOptions } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest, type FastifyServerOptions } from 'fastify';
 import {
   type ErrorEnvelope,
   HealthResponseSchema,
@@ -10,12 +10,14 @@ import { QrChallengeStore, SessionStore } from './auth/stores';
 import { NeteaseProvider, type AuthProvider, type ContentProvider } from './providers';
 import { registerAuthRoutes } from './routes/auth';
 import { registerContentRoutes } from './routes/content';
+import { GatewayMetrics } from './observability/metrics';
 
 export interface BuildAppOptions {
   logger?: FastifyServerOptions['logger'];
   provider?: ContentProvider;
   authProvider?: AuthProvider;
   readinessProbe?: () => Promise<boolean>;
+  metrics?: GatewayMetrics;
 }
 
 function requestId(value: string | number): string {
@@ -57,6 +59,36 @@ export function buildApp(
       },
     genReqId: () => `req_${randomUUID()}`,
   });
+  const metrics = options.metrics ?? new GatewayMetrics();
+  const requestStartTimes = new WeakMap<FastifyRequest, number>();
+
+  app.addHook('onRequest', async (request) => {
+    requestStartTimes.set(request, Date.now());
+  });
+
+  app.addHook('onSend', async (_request, reply, payload) => {
+    if (reply.statusCode < 400 || typeof payload !== 'string') return payload;
+    try {
+      const body = JSON.parse(payload) as { error?: { code?: unknown } };
+      if (typeof body.error?.code === 'string') metrics.recordError(body.error.code);
+    } catch {
+      // Non-JSON error payloads are still covered by request status metrics.
+    }
+    return payload;
+  });
+
+  app.addHook('onResponse', async (request, reply) => {
+    const durationMs = Math.max(0, Date.now() - (requestStartTimes.get(request) ?? Date.now()));
+    const route = request.routeOptions.url ?? request.url.split('?')[0] ?? request.url;
+    metrics.recordRequest({ method: request.method, route, statusCode: reply.statusCode, durationMs });
+    request.log.info({
+      requestId: requestId(request.id),
+      method: request.method,
+      route,
+      statusCode: reply.statusCode,
+      durationMs,
+    }, 'request completed');
+  });
 
   const allowedOrigins = config.ALLOWED_ORIGINS === '*'
     ? null
@@ -97,6 +129,7 @@ export function buildApp(
     bucket.count += 1;
     rateBuckets.set(key, bucket);
     if (bucket.count > config.RATE_LIMIT_MAX_REQUESTS) {
+      metrics.recordRateLimit();
       const response: ErrorEnvelope = {
         error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.', retryable: true },
         requestId: requestId(request.id),
@@ -137,7 +170,13 @@ export function buildApp(
   app.get('/v1/ready', readyHandler);
   app.get('/ready', readyHandler);
 
-  const provider = options.provider ?? new NeteaseProvider({ baseUrl: config.NETEASE_API_BASE_URL });
+  const provider = options.provider ?? new NeteaseProvider({
+    baseUrl: config.NETEASE_API_BASE_URL,
+    onRequestComplete: (metric) => {
+      metrics.recordUpstream(metric);
+      app.log.info({ ...metric, upstreamDurationMs: metric.durationMs }, 'upstream request completed');
+    },
+  });
   const sessions = new SessionStore(
     config.SESSION_ENCRYPTION_KEY,
     config.SESSION_TTL_MS,

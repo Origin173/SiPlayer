@@ -27,4 +27,19 @@ describe('NeteaseApiClient', () => {
     await expect(clientWithPayload({ code: 301, message: '需要登录' }).get('/search', {}, (payload) => payload))
       .rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE', retryable: true });
   });
+
+  it('reports upstream duration and outcome without including query values', async () => {
+    const events: Array<{ path: string; statusCode?: number; outcome: string }> = [];
+    const client = new NeteaseApiClient({
+      baseUrl: 'http://upstream.test',
+      fetchImpl: async () => new Response(JSON.stringify({ code: 200 }), { status: 200 }),
+      onRequestComplete: (metric) => events.push(metric),
+    });
+
+    await client.get('/search', { keywords: 'private query' }, (payload) => payload);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ path: '/search', statusCode: 200, outcome: 'success' });
+    expect(events[0]?.path).not.toContain('private query');
+  });
 });

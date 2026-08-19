@@ -5,6 +5,14 @@ export interface NeteaseApiClientOptions {
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
   getCookie?: () => Promise<string | undefined>;
+  onRequestComplete?: (metric: UpstreamRequestMetric) => void;
+}
+
+export interface UpstreamRequestMetric {
+  path: string;
+  statusCode?: number;
+  durationMs: number;
+  outcome: 'success' | 'error';
 }
 
 type QueryValue = string | number | boolean;
@@ -26,12 +34,14 @@ export class NeteaseApiClient {
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
   private readonly getCookie?: () => Promise<string | undefined>;
+  private readonly onRequestComplete?: (metric: UpstreamRequestMetric) => void;
 
   constructor(options: NeteaseApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.timeoutMs = options.timeoutMs ?? 8_000;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.getCookie = options.getCookie;
+    this.onRequestComplete = options.onRequestComplete;
   }
 
   async get<T>(
@@ -48,6 +58,9 @@ export class NeteaseApiClient {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const startedAt = Date.now();
+    let statusCode: number | undefined;
+    let outcome: UpstreamRequestMetric['outcome'] = 'error';
     try {
       const cookie = cookieOverride ?? (this.getCookie ? await this.getCookie() : undefined);
       const response = await this.fetchImpl(url, {
@@ -59,6 +72,7 @@ export class NeteaseApiClient {
       });
 
       const payload: unknown = await response.json().catch(() => null);
+      statusCode = response.status;
       if (!response.ok) {
         if (cookieOverride && (response.status === 401 || response.status === 403)) {
           throw new NeteaseProviderError('AUTH_EXPIRED', 'The upstream login session has expired.', false, response.status);
@@ -73,7 +87,9 @@ export class NeteaseApiClient {
       }
 
       try {
-        return parse(payload);
+        const result = parse(payload);
+        outcome = 'success';
+        return result;
       } catch {
         throw new NeteaseProviderError('UPSTREAM_UNAVAILABLE', 'Music service returned an unsupported response.', true, response.status);
       }
@@ -85,6 +101,16 @@ export class NeteaseApiClient {
       throw new NeteaseProviderError('UPSTREAM_UNAVAILABLE', 'Music service is temporarily unavailable.', true);
     } finally {
       clearTimeout(timeout);
+      try {
+        this.onRequestComplete?.({
+          path,
+          statusCode,
+          durationMs: Math.max(0, Date.now() - startedAt),
+          outcome,
+        });
+      } catch {
+        // Observability must never change the provider result.
+      }
     }
   }
 }
