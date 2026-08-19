@@ -56,6 +56,26 @@ describe('session stores', () => {
     }
   });
 
+  it('skips persisted sessions with an invalid user profile', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'siplayer-session-'));
+    const path = join(directory, 'sessions.json');
+    try {
+      const first = new SessionStore('a-test-secret-that-is-long-enough', 60_000, path);
+      first.create(user, 'MUSIC_U=upstream-secret');
+      const persisted = JSON.parse(readFileSync(path, 'utf8')) as Array<Record<string, unknown>>;
+      const persistedEntry = persisted[0];
+      if (!persistedEntry) throw new Error('Expected one persisted session');
+      persistedEntry.user = { id: 42, nickname: null };
+      writeFileSync(path, JSON.stringify(persisted), 'utf8');
+
+      const restored = new SessionStore('a-test-secret-that-is-long-enough', 60_000, path);
+
+      expect(restored.size()).toBe(0);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it('keeps the in-memory session when persistence is temporarily unavailable', () => {
     const directory = mkdtempSync(join(tmpdir(), 'siplayer-session-'));
     const errors: unknown[] = [];

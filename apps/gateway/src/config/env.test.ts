@@ -1,5 +1,7 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadConfig } from './env';
+import { defaultSessionStorePath, loadConfig } from './env';
 
 describe('gateway config', () => {
   it('uses safe local defaults', () => {
@@ -9,6 +11,12 @@ describe('gateway config', () => {
     expect(config.HOST).toBe('127.0.0.1');
     expect(config.NETEASE_API_BASE_URL).toBe('http://127.0.0.1:3000');
     expect(config.TRUST_PROXY).toBe(false);
+    expect(config.SESSION_STORE_PATH).toBe(defaultSessionStorePath());
+  });
+
+  it('keeps the Windows default on D drive and uses the OS temp directory elsewhere', () => {
+    expect(defaultSessionStorePath('win32')).toBe('D:\\tmp\\siplayer\\gateway-sessions.json');
+    expect(defaultSessionStorePath('linux')).toBe(join(tmpdir(), 'siplayer', 'gateway-sessions.json'));
   });
 
   it('rejects an invalid upstream URL', () => {

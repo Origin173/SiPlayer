@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { UserProfile } from '@siplayer/contracts';
+import { UserProfileSchema, type UserProfile } from '@siplayer/contracts';
 
 export interface SessionPrincipal {
   user: UserProfile;
@@ -78,8 +78,10 @@ export class SessionStore {
       if (!item || typeof item !== 'object') continue;
       const value = item as Partial<StoredSession> & { tokenHash?: unknown };
       if (typeof value.tokenHash !== 'string' || typeof value.encryptedCookie !== 'string' || typeof value.expiresAtMs !== 'number' || !value.user) continue;
+      const user = UserProfileSchema.safeParse(value.user);
+      if (!user.success) continue;
       this.sessions.set(value.tokenHash, {
-        user: value.user,
+        user: user.data,
         encryptedCookie: value.encryptedCookie,
         expiresAtMs: value.expiresAtMs,
       });

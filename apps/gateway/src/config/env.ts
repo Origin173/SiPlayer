@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -19,9 +21,15 @@ const envSchema = z.object({
 
 export type GatewayConfig = z.infer<typeof envSchema>;
 
+export function defaultSessionStorePath(platform: NodeJS.Platform = process.platform): string {
+  return platform === 'win32'
+    ? 'D:\\tmp\\siplayer\\gateway-sessions.json'
+    : join(tmpdir(), 'siplayer', 'gateway-sessions.json');
+}
+
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): GatewayConfig {
   const config = envSchema.parse(source);
-  const sessionStorePath = config.SESSION_STORE_PATH ?? (config.NODE_ENV === 'test' ? undefined : 'D:\\tmp\\siplayer\\gateway-sessions.json');
+  const sessionStorePath = config.SESSION_STORE_PATH ?? (config.NODE_ENV === 'test' ? undefined : defaultSessionStorePath());
   if (
     config.NODE_ENV === 'production'
     && (config.SESSION_ENCRYPTION_KEY === 'dev-only-session-encryption-key' || config.ALLOWED_ORIGINS === '*' || !sessionStorePath)
