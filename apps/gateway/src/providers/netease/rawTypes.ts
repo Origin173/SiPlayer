@@ -16,7 +16,9 @@ export const RawAlbumSchema = z.object({
   picUrl: z.string().nullable().optional(),
   pic_str: z.string().nullable().optional(),
   publishTime: z.number().nullable().optional(),
+  description: z.string().nullable().optional(),
   artists: z.array(RawArtistSchema).optional(),
+  artist: RawArtistSchema.nullable().optional(),
 }).passthrough();
 export type RawAlbum = z.infer<typeof RawAlbumSchema>;
 
@@ -81,6 +83,33 @@ export const RawTrackDetailResponseSchema = z.object({
   privileges: z.array(RawPrivilegeSchema).default([]),
 }).passthrough();
 export type RawTrackDetailResponse = z.infer<typeof RawTrackDetailResponseSchema>;
+
+export const RawAlbumDetailResponseSchema = z.object({
+  code: z.number().optional(),
+  album: RawAlbumSchema,
+  songs: z.array(RawSongSchema).default([]),
+}).passthrough();
+export type RawAlbumDetailResponse = z.infer<typeof RawAlbumDetailResponseSchema>;
+
+export const RawArtistDetailResponseSchema = z.object({
+  code: z.number().optional(),
+  artist: RawArtistSchema.optional(),
+  data: z.unknown().optional(),
+  briefDesc: z.string().nullable().optional(),
+  desc: z.string().nullable().optional(),
+}).passthrough();
+export type RawArtistDetailResponse = z.infer<typeof RawArtistDetailResponseSchema>;
+
+export const RawArtistAlbumResponseSchema = z.object({
+  code: z.number().optional(),
+  artist: RawArtistSchema.optional(),
+  hotAlbums: z.array(RawAlbumSchema).default([]),
+  albums: z.array(RawAlbumSchema).default([]),
+  albumCount: z.number().nullable().optional(),
+  total: z.number().nullable().optional(),
+  more: z.boolean().optional(),
+}).passthrough();
+export type RawArtistAlbumResponse = z.infer<typeof RawArtistAlbumResponseSchema>;
 
 export const RawLyricPartSchema = z.object({
   lyric: z.string().nullable().optional(),

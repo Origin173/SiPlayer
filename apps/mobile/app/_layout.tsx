@@ -43,6 +43,8 @@ function RootNavigator() {
         <Stack.Screen name="now-playing" options={{ presentation: 'modal' }} />
         <Stack.Screen name="lyrics" options={{ presentation: 'modal' }} />
         <Stack.Screen name="playlist/[id]" />
+        <Stack.Screen name="album/[id]" />
+        <Stack.Screen name="artist/[id]" />
         <Stack.Screen name="login" />
         <Stack.Screen name="settings" />
       </Stack>

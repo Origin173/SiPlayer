@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import type { AudioQuality, CatalogSearchPage, Lyrics, PlaylistDetail, StreamInfo, Track, TrackPage } from '@siplayer/contracts';
+import type { AlbumDetail, ArtistAlbumPage, ArtistDetail, AudioQuality, CatalogSearchPage, Lyrics, PlaylistDetail, StreamInfo, Track, TrackPage } from '@siplayer/contracts';
 import { buildApp } from '../app';
 import { NeteaseProviderError, type ContentProvider } from '../providers';
 import { loadConfig } from '../config/env';
@@ -15,10 +15,25 @@ const track: Track = {
   playable: true,
 };
 
+const album: AlbumDetail = {
+  id: 'album-1',
+  name: 'Quiet Album',
+  artworkUrl: null,
+  artists: [{ id: 'artist-1', name: 'Origin' }],
+  tracks: [track],
+};
+
+const artist: ArtistDetail = { id: 'artist-1', name: 'Origin', description: null };
+const artistAlbums: ArtistAlbumPage = { items: [], page: 1, pageSize: 30, hasMore: false };
+
 const provider: ContentProvider = {
   searchTracks: async (): Promise<TrackPage> => ({ items: [track], page: 1, pageSize: 30, hasMore: false }),
   searchCatalog: async (_query, type): Promise<CatalogSearchPage> => ({ type, items: [], page: 1, pageSize: 30, hasMore: false }),
   getTrack: async () => track,
+  getAlbum: async () => album,
+  getArtist: async () => artist,
+  getArtistTopTracks: async () => [track],
+  getArtistAlbums: async (): Promise<ArtistAlbumPage> => artistAlbums,
   getLyrics: async (): Promise<Lyrics> => ({ type: 'NONE', lines: [] }),
   getPlaylist: async (): Promise<PlaylistDetail> => ({ id: 'playlist-1', name: 'Focus', tracks: [] }),
   resolveStream: async (id: string, quality: AudioQuality): Promise<StreamInfo> => ({
@@ -69,6 +84,22 @@ describe('content routes', () => {
     expect(response.statusCode).toBe(200);
     expect(body.data).toMatchObject({ trackId: 'track-1', requestedQuality: 'high', actualQuality: 'high' });
     expect(body.requestId).toMatch(/^req_/);
+  });
+
+  it('serves normalized album and artist detail resources', async () => {
+    const albumResponse = await app.inject({ method: 'GET', url: '/v1/albums/album-1' });
+    const artistResponse = await app.inject({ method: 'GET', url: '/v1/artists/artist-1' });
+    const topTracksResponse = await app.inject({ method: 'GET', url: '/v1/artists/artist-1/top-tracks' });
+    const albumsResponse = await app.inject({ method: 'GET', url: '/v1/artists/artist-1/albums' });
+
+    expect(albumResponse.statusCode).toBe(200);
+    expect(albumResponse.json<{ data: AlbumDetail }>().data.tracks[0]?.id).toBe('track-1');
+    expect(artistResponse.statusCode).toBe(200);
+    expect(artistResponse.json<{ data: ArtistDetail }>().data.name).toBe('Origin');
+    expect(topTracksResponse.statusCode).toBe(200);
+    expect(topTracksResponse.json<{ data: Track[] }>().data[0]?.artistText).toBe('Origin');
+    expect(albumsResponse.statusCode).toBe(200);
+    expect(albumsResponse.json<{ data: ArtistAlbumPage }>().data.page).toBe(1);
   });
 
   it('rejects provider payloads that violate the stable contract', async () => {

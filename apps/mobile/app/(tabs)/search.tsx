@@ -1,25 +1,36 @@
-import { useEffect, useState } from 'react';
 import { FlashList } from '@shopify/flash-list';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTrackSearch } from '@/api/hooks';
+import type { SearchType } from '@siplayer/contracts';
+import { useCatalogSearch, useTrackSearch } from '@/api/hooks';
+import { CatalogRow, SongRow } from '@/components/music';
 import { Button, ErrorState, Screen, SearchField, Skeleton } from '@/components/ui';
-import { SongRow } from '@/components/music';
-import { queueItemFromTrack } from '@/player/playbackTypes';
-import { usePlayer } from '@/player';
 import { loadSearchHistory, recordSearchKeyword } from '@/features/searchHistory';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { queueItemFromTrack } from '@/player/playbackTypes';
+import { usePlayer } from '@/player';
 import { useTheme } from '@/theme';
 
 export default function SearchScreen() {
   const { theme } = useTheme();
+  const router = useRouter();
   const player = usePlayer();
   const [keyword, setKeyword] = useState('');
   const [submittedKeyword, setSubmittedKeyword] = useState('');
   const [history, setHistory] = useState<string[]>([]);
+  const [searchType, setSearchType] = useState<SearchType>('track');
   const debouncedSubmittedKeyword = useDebouncedValue(submittedKeyword, 300);
-  const search = useTrackSearch(debouncedSubmittedKeyword);
-  const results = search.data?.pages.flatMap((page) => page.items) ?? [];
+  const trackSearch = useTrackSearch(debouncedSubmittedKeyword, searchType === 'track');
+  const catalogSearch = useCatalogSearch(
+    debouncedSubmittedKeyword,
+    searchType === 'track' ? 'album' : searchType,
+    searchType !== 'track',
+  );
+  const results = trackSearch.data?.pages.flatMap((page) => page.items) ?? [];
+  const catalogItems = catalogSearch.data?.items ?? [];
   const queueItems = results.map(queueItemFromTrack);
+  const activeSearch = searchType === 'track' ? trackSearch : catalogSearch;
   const isDebouncing = submittedKeyword !== debouncedSubmittedKeyword;
 
   useEffect(() => {
@@ -63,12 +74,32 @@ export default function SearchScreen() {
     );
   }
 
-  if (isDebouncing || search.isPending) {
-    return <Screen>{intro}<View style={styles.results}><Skeleton height={56} /><Skeleton height={56} /><Skeleton height={56} /></View></Screen>;
+  if (isDebouncing || activeSearch.isPending) {
+    return <Screen>{intro}<SearchTypeSwitcher onChange={setSearchType} value={searchType} /><View style={styles.results}><Skeleton height={56} /><Skeleton height={56} /><Skeleton height={56} /></View></Screen>;
   }
 
-  if (search.isError) {
-    return <Screen>{intro}<View style={styles.results}><ErrorState onRetry={() => void search.refetch()} /></View></Screen>;
+  if (activeSearch.isError) {
+    return <Screen>{intro}<SearchTypeSwitcher onChange={setSearchType} value={searchType} /><View style={styles.results}><ErrorState onRetry={() => void activeSearch.refetch()} /></View></Screen>;
+  }
+
+  if (searchType !== 'track') {
+    return (
+      <Screen contentContainerStyle={styles.listScreen} scroll={false}>
+        <FlashList
+          contentContainerStyle={styles.listContent}
+          data={catalogItems}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={<Text style={[styles.historyText, { color: theme.colors.textSecondary }]}>没有找到匹配的结果</Text>}
+          ListHeaderComponent={<View style={styles.results}><SearchTypeSwitcher onChange={setSearchType} value={searchType} /><View style={styles.resultHeader}><Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>{searchType === 'album' ? '专辑' : searchType === 'artist' ? '歌手' : '歌单'}</Text><Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>{catalogItems.length} 个结果</Text></View></View>}
+          renderItem={({ item }) => <CatalogRow item={item} onPress={() => {
+            if (searchType === 'playlist') router.push(`/playlist/${item.id}`);
+            else if (searchType === 'album') router.push(`/album/${item.id}`);
+            else router.push(`/artist/${item.id}`);
+          }} type={searchType} />}
+          showsVerticalScrollIndicator={false}
+        />
+      </Screen>
+    );
   }
 
   return (
@@ -78,28 +109,36 @@ export default function SearchScreen() {
         data={results}
         keyExtractor={(track) => track.id}
         ListEmptyComponent={<Text style={[styles.historyText, { color: theme.colors.textSecondary }]}>没有找到匹配的歌曲</Text>}
-        ListFooterComponent={search.hasNextPage ? <Button disabled={search.isFetchingNextPage} onPress={() => void search.fetchNextPage()} variant="secondary">{search.isFetchingNextPage ? '加载中…' : '加载更多'}</Button> : null}
-        ListHeaderComponent={(
-          <View style={styles.results}>
-            <View style={styles.resultHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>歌曲</Text>
-              {search.isFetching ? <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>更新中</Text> : <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>{results.length} 个结果</Text>}
-            </View>
-          </View>
-        )}
+        ListFooterComponent={trackSearch.hasNextPage ? <Button disabled={trackSearch.isFetchingNextPage} onPress={() => void trackSearch.fetchNextPage()} variant="secondary">{trackSearch.isFetchingNextPage ? '加载中…' : '加载更多'}</Button> : null}
+        ListHeaderComponent={<View style={styles.results}><SearchTypeSwitcher onChange={setSearchType} value={searchType} /><View style={styles.resultHeader}><Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>歌曲</Text>{trackSearch.isFetching ? <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>更新中</Text> : <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>{results.length} 个结果</Text>}</View></View>}
         onEndReached={() => {
-          if (search.hasNextPage && !search.isFetchingNextPage) void search.fetchNextPage();
+          if (trackSearch.hasNextPage && !trackSearch.isFetchingNextPage) void trackSearch.fetchNextPage();
         }}
         onEndReachedThreshold={0.5}
-        renderItem={({ item, index }) => (
-          <SongRow
-            onPress={() => player.playTrack(queueItemFromTrack(item), { queue: queueItems, startIndex: index })}
-            track={item}
-          />
-        )}
+        renderItem={({ item, index }) => <SongRow onPress={() => player.playTrack(queueItemFromTrack(item), { queue: queueItems, startIndex: index })} track={item} />}
         showsVerticalScrollIndicator={false}
       />
     </Screen>
+  );
+}
+
+function SearchTypeSwitcher({ value, onChange }: { value: SearchType; onChange: (value: SearchType) => void }) {
+  const { theme } = useTheme();
+  const options: Array<{ value: SearchType; label: string }> = [
+    { value: 'track', label: '歌曲' },
+    { value: 'album', label: '专辑' },
+    { value: 'artist', label: '歌手' },
+    { value: 'playlist', label: '歌单' },
+  ];
+
+  return (
+    <View style={[styles.segment, { backgroundColor: theme.colors.surfaceMuted }]}>
+      {options.map((option) => (
+        <Pressable accessibilityLabel={`搜索${option.label}`} accessibilityRole="button" key={option.value} onPress={() => onChange(option.value)} style={[styles.segmentItem, value === option.value && { backgroundColor: theme.colors.surface }]}>
+          <Text style={[styles.segmentLabel, { color: value === option.value ? theme.colors.textPrimary : theme.colors.textSecondary }]}>{option.label}</Text>
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -108,15 +147,17 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, marginTop: 4 },
   search: { marginTop: 20 },
   history: { marginTop: 34 },
-  results: { marginTop: 30 },
-  resultHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  results: { marginTop: 20 },
+  resultHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, marginTop: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '700' },
   resultCount: { fontSize: 12 },
   historyText: { fontSize: 14, lineHeight: 20, marginTop: 12 },
   historyList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   historyChip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   historyChipText: { fontSize: 13 },
-  loading: { gap: 12 },
   listScreen: { paddingHorizontal: 0, paddingBottom: 0 },
   listContent: { paddingBottom: 48, paddingHorizontal: 20 },
+  segment: { borderRadius: 999, flexDirection: 'row', gap: 4, marginTop: 20, padding: 3 },
+  segmentItem: { alignItems: 'center', borderRadius: 999, flex: 1, minHeight: 38, justifyContent: 'center' },
+  segmentLabel: { fontSize: 13, fontWeight: '600' },
 });

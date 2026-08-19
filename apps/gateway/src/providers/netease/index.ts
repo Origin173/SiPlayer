@@ -1,4 +1,4 @@
-import type { AudioQuality, CatalogSearchPage, Lyrics, PlaylistCollections, PlaylistDetail, PlaylistSummary, StreamInfo, Track, TrackPage, UserProfile } from '@siplayer/contracts';
+import type { AlbumDetail, ArtistAlbumPage, ArtistDetail, AudioQuality, CatalogSearchPage, Lyrics, PlaylistCollections, PlaylistDetail, PlaylistSummary, StreamInfo, Track, TrackPage, UserProfile } from '@siplayer/contracts';
 import { NeteaseApiClient } from './client';
 import { neteaseEndpoints } from './endpoints';
 import { NeteaseProviderError } from './errors';
@@ -16,6 +16,9 @@ import {
 import { mapPlaylistSummary, mapRecentTracks, mapUserProfile } from './authMapper';
 import {
   mapCatalogSearchResponse,
+  mapAlbumDetail,
+  mapArtistAlbumPage,
+  mapArtistDetail,
   mapDetailTrack,
   mapLyrics,
   mapPlaylist,
@@ -26,6 +29,9 @@ import {
   type RawPrivilege,
   type RawSong,
   RawLyricsResponseSchema,
+  RawAlbumDetailResponseSchema,
+  RawArtistAlbumResponseSchema,
+  RawArtistDetailResponseSchema,
   RawPlaylistDetailResponseSchema,
   RawPlaylistTracksResponseSchema,
   RawSearchResponseSchema,
@@ -37,6 +43,10 @@ export interface ContentProvider {
   searchTracks: (keyword: string, page: number, pageSize: number) => Promise<TrackPage>;
   searchCatalog: (keyword: string, type: 'album' | 'artist' | 'playlist', page: number, pageSize: number) => Promise<CatalogSearchPage>;
   getTrack: (id: string) => Promise<Track>;
+  getAlbum: (id: string) => Promise<AlbumDetail>;
+  getArtist: (id: string) => Promise<ArtistDetail>;
+  getArtistTopTracks: (id: string) => Promise<Track[]>;
+  getArtistAlbums: (id: string, page: number, pageSize: number) => Promise<ArtistAlbumPage>;
   getLyrics: (id: string) => Promise<Lyrics>;
   getPlaylist: (id: string) => Promise<PlaylistDetail>;
   resolveStream: (id: string, quality: AudioQuality) => Promise<StreamInfo>;
@@ -89,6 +99,42 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
     const song = raw.songs[0];
     if (!song) throw new NeteaseProviderError('NOT_FOUND', 'The requested track was not found.', false, 404);
     return mapDetailTrack(song, raw.privileges[0]);
+  }
+
+  async getAlbum(id: string): Promise<AlbumDetail> {
+    const raw = await this.client.get(
+      neteaseEndpoints.albumDetail,
+      { id },
+      (payload) => RawAlbumDetailResponseSchema.parse(payload),
+    );
+    return mapAlbumDetail(raw);
+  }
+
+  async getArtist(id: string): Promise<ArtistDetail> {
+    const raw = await this.client.get(
+      neteaseEndpoints.artistDetail,
+      { id },
+      (payload) => RawArtistDetailResponseSchema.parse(payload),
+    );
+    return mapArtistDetail(raw, id);
+  }
+
+  async getArtistTopTracks(id: string): Promise<Track[]> {
+    const raw = await this.client.get(
+      neteaseEndpoints.artistTopTracks,
+      { id },
+      (payload) => RawTrackDetailResponseSchema.parse(payload),
+    );
+    return raw.songs.map((song) => mapDetailTrack(song, raw.privileges.find((privilege) => privilege.id === song.id) ?? song.privilege));
+  }
+
+  async getArtistAlbums(id: string, page: number, pageSize: number): Promise<ArtistAlbumPage> {
+    const raw = await this.client.get(
+      neteaseEndpoints.artistAlbums,
+      { id, limit: pageSize, offset: (page - 1) * pageSize },
+      (payload) => RawArtistAlbumResponseSchema.parse(payload),
+    );
+    return mapArtistAlbumPage(raw, page, pageSize);
   }
 
   async getLyrics(id: string): Promise<Lyrics> {

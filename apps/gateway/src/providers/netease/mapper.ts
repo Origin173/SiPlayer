@@ -1,5 +1,9 @@
+import { RawArtistSchema } from './rawTypes';
 import type {
+  AlbumDetail,
   AlbumSummary,
+  ArtistAlbumPage,
+  ArtistDetail,
   ArtistSummary,
   AudioQuality,
   CatalogSearchPage,
@@ -12,6 +16,9 @@ import type {
 } from '@siplayer/contracts';
 import type {
   RawAlbum,
+  RawAlbumDetailResponse,
+  RawArtistDetailResponse,
+  RawArtistAlbumResponse,
   RawArtist,
   RawLyricsResponse,
   RawPlaylist,
@@ -41,13 +48,67 @@ export function mapArtist(raw: RawArtist): ArtistSummary {
 
 export function mapAlbum(raw: RawAlbum | null | undefined): AlbumSummary | null {
   if (!raw) return null;
-  const artists = (raw.artists ?? []).map(mapArtist);
+  const artists = (raw.artists ?? (raw.artist ? [raw.artist] : [])).map(mapArtist);
   return {
     id: raw.id,
     name: raw.name?.trim() || '未知专辑',
     artworkUrl: safeUrl(raw.picUrl ?? raw.pic_str),
     artists,
     publishDate: raw.publishTime ? new Date(raw.publishTime).toISOString() : null,
+  };
+}
+
+export function mapAlbumDetail(raw: RawAlbumDetailResponse): AlbumDetail {
+  const album = mapAlbum(raw.album);
+  if (!album) throw new Error('Album detail did not contain an album.');
+  return {
+    ...album,
+    description: raw.album.description ?? null,
+    tracks: raw.songs.map((song) => mapDetailTrack(song, song.privilege)),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function findArtist(value: unknown): RawArtist | null {
+  const parsed = RawArtistSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  if (!isRecord(value)) return null;
+  for (const key of ['artist', 'profile', 'data']) {
+    const candidate = findArtist(value[key]);
+    if (candidate) return candidate;
+  }
+  return null;
+}
+
+function firstString(value: unknown, keys: string[]): string | null {
+  if (!isRecord(value)) return null;
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+  return null;
+}
+
+export function mapArtistDetail(raw: RawArtistDetailResponse, id: string): ArtistDetail {
+  const artist = raw.artist ?? findArtist(raw.data);
+  const summary = mapArtist(artist ?? { id, name: '未知艺术家' });
+  return {
+    ...summary,
+    description: firstString(raw, ['desc', 'briefDesc']) ?? firstString(raw.data, ['desc', 'briefDesc', 'description']),
+  };
+}
+
+export function mapArtistAlbumPage(raw: RawArtistAlbumResponse, page: number, pageSize: number): ArtistAlbumPage {
+  const items = (raw.hotAlbums.length > 0 ? raw.hotAlbums : raw.albums).map((album) => mapAlbum(album)).filter((album): album is AlbumSummary => Boolean(album));
+  const total = raw.total ?? raw.albumCount ?? page * pageSize + items.length;
+  return {
+    items,
+    page,
+    pageSize,
+    hasMore: raw.more ?? page * pageSize < total,
   };
 }
 

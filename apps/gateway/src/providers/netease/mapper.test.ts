@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import searchFixture from './fixtures/search.json';
 import lyricsFixture from './fixtures/lyrics.json';
 import streamFixture from './fixtures/stream.json';
-import { mapCatalogSearchResponse, mapLyrics, mapSearchResponse, mapStream, parseLrc } from './mapper';
-import { RawLyricsResponseSchema, RawSearchResponseSchema, RawStreamResponseSchema } from './rawTypes';
+import { mapAlbumDetail, mapArtistAlbumPage, mapArtistDetail, mapCatalogSearchResponse, mapLyrics, mapSearchResponse, mapStream, parseLrc } from './mapper';
+import { RawAlbumDetailResponseSchema, RawArtistAlbumResponseSchema, RawArtistDetailResponseSchema, RawLyricsResponseSchema, RawSearchResponseSchema, RawStreamResponseSchema } from './rawTypes';
 import type { AudioQuality } from '@siplayer/contracts';
 
 describe('netease mapper', () => {
@@ -33,6 +33,30 @@ describe('netease mapper', () => {
 
     expect(page).toMatchObject({ type: 'album', hasMore: false });
     expect(page.items[0]).toMatchObject({ id: '9', name: 'Quiet Album' });
+  });
+
+  it('maps album details and preserves track order', () => {
+    const raw = RawAlbumDetailResponseSchema.parse({
+      code: 200,
+      album: { id: 9, name: 'Quiet Album', picUrl: 'https://example.com/album.png', description: 'A calm record', artists: [{ id: 7, name: 'Origin' }] },
+      songs: [
+        { id: 2, name: 'Second', ar: [{ id: 7, name: 'Origin' }], al: { id: 9, name: 'Quiet Album' } },
+        { id: 1, name: 'First', ar: [{ id: 7, name: 'Origin' }], al: { id: 9, name: 'Quiet Album' } },
+      ],
+    });
+    const detail = mapAlbumDetail(raw);
+
+    expect(detail).toMatchObject({ id: '9', description: 'A calm record' });
+    expect(detail.tracks.map((track) => track.id)).toEqual(['2', '1']);
+  });
+
+  it('maps flexible artist detail and paged albums responses', () => {
+    const artist = mapArtistDetail(RawArtistDetailResponseSchema.parse({ code: 200, data: { artist: { id: 7, name: 'Origin', briefDesc: 'Composer' } } }), '7');
+    const albums = mapArtistAlbumPage(RawArtistAlbumResponseSchema.parse({ code: 200, total: 1, hotAlbums: [{ id: 9, name: 'Quiet Album', artists: [{ id: 7, name: 'Origin' }] }] }), 1, 30);
+
+    expect(artist).toMatchObject({ id: '7', name: 'Origin' });
+    expect(albums).toMatchObject({ page: 1, hasMore: false });
+    expect(albums.items[0]?.id).toBe('9');
   });
 
   it('parses and merges translated lyrics once at the adapter boundary', () => {

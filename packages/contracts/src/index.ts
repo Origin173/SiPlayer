@@ -18,6 +18,25 @@ export const AlbumSummarySchema = z.object({
 });
 export type AlbumSummary = z.infer<typeof AlbumSummarySchema>;
 
+export const AlbumDetailSchema = AlbumSummarySchema.extend({
+  description: z.string().nullable().optional(),
+  tracks: z.array(z.lazy(() => TrackSchema)),
+});
+export type AlbumDetail = z.infer<typeof AlbumDetailSchema>;
+
+export const ArtistDetailSchema = ArtistSummarySchema.extend({
+  description: z.string().nullable().optional(),
+});
+export type ArtistDetail = z.infer<typeof ArtistDetailSchema>;
+
+export const ArtistAlbumPageSchema = z.object({
+  items: z.array(AlbumSummarySchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  hasMore: z.boolean(),
+});
+export type ArtistAlbumPage = z.infer<typeof ArtistAlbumPageSchema>;
+
 export const AvailabilityReasonSchema = z.enum([
   'AVAILABLE',
   'AUTH_REQUIRED',

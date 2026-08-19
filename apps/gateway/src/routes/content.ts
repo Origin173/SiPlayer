@@ -1,5 +1,8 @@
 import {
   AudioQualitySchema,
+  AlbumDetailSchema,
+  ArtistAlbumPageSchema,
+  ArtistDetailSchema,
   CatalogSearchPageSchema,
   LyricsSchema,
   PlaylistDetailSchema,
@@ -22,6 +25,10 @@ const searchQuerySchema = z.object({
 
 const idParamsSchema = z.object({ id: z.string().trim().min(1) });
 const streamQuerySchema = z.object({ quality: AudioQualitySchema.default('auto') }).strict();
+const pageQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(50).default(30),
+}).strict();
 
 interface ContentRouteOptions {
   provider: ContentProvider;
@@ -140,6 +147,79 @@ export function registerContentRoutes(app: FastifyInstance, options: ContentRout
 
     try {
       const data = LyricsSchema.parse(await options.provider.getLyrics(parsed.data.id));
+      return { data, requestId: requestId(request) };
+    } catch (error) {
+      return sendError(reply, request, normalizeProviderError(error));
+    }
+  });
+
+  app.get('/v1/albums/:id', async (request, reply) => {
+    const parsed = idParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      return sendError(reply, request, {
+        code: 'VALIDATION_ERROR',
+        message: 'Album id is invalid.',
+        retryable: false,
+      });
+    }
+
+    try {
+      const data = AlbumDetailSchema.parse(await options.provider.getAlbum(parsed.data.id));
+      return { data, requestId: requestId(request) };
+    } catch (error) {
+      return sendError(reply, request, normalizeProviderError(error));
+    }
+  });
+
+  app.get('/v1/artists/:id/top-tracks', async (request, reply) => {
+    const parsed = idParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      return sendError(reply, request, {
+        code: 'VALIDATION_ERROR',
+        message: 'Artist id is invalid.',
+        retryable: false,
+      });
+    }
+
+    try {
+      const data = z.array(TrackSchema).parse(await options.provider.getArtistTopTracks(parsed.data.id));
+      return { data, requestId: requestId(request) };
+    } catch (error) {
+      return sendError(reply, request, normalizeProviderError(error));
+    }
+  });
+
+  app.get('/v1/artists/:id/albums', async (request, reply) => {
+    const params = idParamsSchema.safeParse(request.params);
+    const query = pageQuerySchema.safeParse(request.query);
+    if (!params.success || !query.success) {
+      return sendError(reply, request, {
+        code: 'VALIDATION_ERROR',
+        message: 'Artist album request is invalid.',
+        retryable: false,
+      });
+    }
+
+    try {
+      const data = ArtistAlbumPageSchema.parse(await options.provider.getArtistAlbums(params.data.id, query.data.page, query.data.pageSize));
+      return { data, requestId: requestId(request) };
+    } catch (error) {
+      return sendError(reply, request, normalizeProviderError(error));
+    }
+  });
+
+  app.get('/v1/artists/:id', async (request, reply) => {
+    const parsed = idParamsSchema.safeParse(request.params);
+    if (!parsed.success) {
+      return sendError(reply, request, {
+        code: 'VALIDATION_ERROR',
+        message: 'Artist id is invalid.',
+        retryable: false,
+      });
+    }
+
+    try {
+      const data = ArtistDetailSchema.parse(await options.provider.getArtist(parsed.data.id));
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));

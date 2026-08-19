@@ -1,6 +1,10 @@
 export const neteaseEndpoints = {
   search: '/cloudsearch',
   trackDetail: '/song/detail',
+  albumDetail: '/album',
+  artistDetail: '/artist/detail',
+  artistTopTracks: '/artist/top/song',
+  artistAlbums: '/artist/album',
   lyrics: '/lyric',
   playlistDetail: '/playlist/detail',
   playlistTracks: '/playlist/track/all',
