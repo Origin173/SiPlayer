@@ -18,6 +18,8 @@ export function MiniPlayer() {
   if (!current) return null;
 
   const isPlaying = playbackState === 'playing';
+  const hasPlaybackError = playbackState === 'error' || playbackState === 'unavailable';
+  const statusText = hasPlaybackError ? (playbackState === 'unavailable' ? '当前歌曲暂不可播放' : '播放遇到问题，点击重试') : current.artistText;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }, theme.shadows.floating]}>
@@ -25,14 +27,14 @@ export function MiniPlayer() {
         <Artwork size={46} title={current.title} uri={current.artworkUrl} />
         <View style={styles.copy}>
           <Text numberOfLines={1} style={[styles.title, { color: theme.colors.textPrimary }]}>{current.title}</Text>
-          <Text numberOfLines={1} style={[styles.artist, { color: theme.colors.textSecondary }]}>{current.artistText}</Text>
+          <Text numberOfLines={1} style={[styles.artist, { color: hasPlaybackError ? theme.colors.danger : theme.colors.textSecondary }]}>{statusText}</Text>
         </View>
       </PressableBody>
       <IconButton
-        accessibilityLabel={isPlaying ? '暂停' : '播放'}
+        accessibilityLabel={hasPlaybackError ? '重试播放' : isPlaying ? '暂停' : '播放'}
         iconSize={22}
-        name={isPlaying ? 'pause' : 'play'}
-        onPress={isPlaying ? player.pause : player.play}
+        name={hasPlaybackError ? 'refresh' : isPlaying ? 'pause' : 'play'}
+        onPress={hasPlaybackError || !isPlaying ? player.play : player.pause}
       />
       <IconButton accessibilityLabel="打开播放队列" iconSize={22} name="list-outline" onPress={() => router.push('/now-playing')} />
       {isPlaying ? <View style={[styles.progress, { backgroundColor: theme.colors.primary }]} /> : null}

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/auth';
 import { useTrackLike } from '@/api/hooks';
 import { Artwork, SongRow } from '@/components/music';
-import { EmptyState, IconButton, Screen } from '@/components/ui';
+import { Button, EmptyState, IconButton, Screen } from '@/components/ui';
 import { trackFromQueueItem } from '@/player/playbackTypes';
 import { usePlayer, usePlayerStore } from '@/player';
 import { useTheme } from '@/theme';
@@ -30,6 +30,10 @@ export default function NowPlayingScreen() {
   useEffect(() => setLiked(current?.track?.liked ?? false), [current?.track?.liked, current?.trackId]);
   const artworkSize = Math.min(Math.max(width - 64, 240), 360);
   const isPlaying = playbackState === 'playing';
+  const hasPlaybackError = playbackState === 'error' || playbackState === 'unavailable';
+  const playbackErrorMessage = playbackState === 'unavailable'
+    ? current?.track?.availability?.message ?? '当前歌曲暂不可播放'
+    : '播放遇到问题，请检查网络后重试。';
   const progress = durationMs > 0 ? Math.min(positionMs / durationMs, 1) : 0;
   const [progressWidth, setProgressWidth] = useState(0);
   const [draftProgress, setDraftProgress] = useState<number | null>(null);
@@ -88,6 +92,13 @@ export default function NowPlayingScreen() {
         <Text numberOfLines={2} style={[styles.trackTitle, { color: theme.colors.textPrimary }]}>{current.title}</Text>
         <Text numberOfLines={1} style={[styles.artist, { color: theme.colors.textSecondary }]}>{current.artistText}</Text>
       </View>
+
+      {hasPlaybackError ? (
+        <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={[styles.playbackError, { backgroundColor: theme.colors.dangerSoft }]}>
+          <Text style={[styles.playbackErrorTitle, { color: theme.colors.danger }]}>{playbackErrorMessage}</Text>
+          <Button onPress={player.play} variant="text">重试播放</Button>
+        </View>
+      ) : null}
 
       <View style={styles.progressWrap}>
         <View
@@ -214,6 +225,8 @@ const styles = StyleSheet.create({
   queueActions: { alignItems: 'center', flexDirection: 'row', gap: 12 },
   clearNext: { fontSize: 12, fontWeight: '600' },
   sourceNote: { fontSize: 11, marginTop: 16, textAlign: 'center' },
+  playbackError: { alignItems: 'center', borderRadius: 12, gap: 2, marginTop: 16, paddingHorizontal: 12, paddingVertical: 8 },
+  playbackErrorTitle: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: { backgroundColor: 'rgba(0, 0, 0, 0.35)', bottom: 0, left: 0, position: 'absolute', right: 0, top: 0 },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '88%', paddingBottom: 24, paddingHorizontal: 16, paddingTop: 10 },
