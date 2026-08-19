@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app';
 import { loadConfig } from './config/env';
+import { GatewayMetrics } from './observability/metrics';
 
 const app = buildApp(loadConfig({ NODE_ENV: 'test' }), { logger: false });
 
@@ -86,6 +87,21 @@ describe('gateway foundation routes', () => {
     expect(first.statusCode).toBe(404);
     expect(second.statusCode).toBe(429);
     expect(second.json<{ error: { code: string } }>().error.code).toBe('RATE_LIMITED');
+  });
+
+  it('records request duration, error codes, and rate-limit counts', async () => {
+    const metrics = new GatewayMetrics();
+    const limited = buildApp(loadConfig({ NODE_ENV: 'test', RATE_LIMIT_MAX_REQUESTS: '1' }), { logger: false, metrics });
+    await limited.inject({ method: 'GET', url: '/v1/does-not-exist' });
+    await limited.inject({ method: 'GET', url: '/v1/does-not-exist' });
+    await limited.close();
+
+    const snapshot = metrics.snapshot();
+    expect(snapshot.requests['GET /v1/does-not-exist']?.count).toBe(2);
+    expect(snapshot.requests['GET /v1/does-not-exist']?.errorCount).toBe(2);
+    expect(snapshot.errors.NOT_FOUND).toBe(1);
+    expect(snapshot.errors.RATE_LIMITED).toBe(1);
+    expect(snapshot.rateLimited).toBe(1);
   });
 
   it('normalizes unknown routes', async () => {
