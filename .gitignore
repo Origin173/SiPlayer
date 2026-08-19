@@ -23,6 +23,11 @@ ios/
 *.p12
 *.key
 
+# Release workflow scratch artifacts
+release-artifacts/
+release-staging/
+release-notes.md
+
 # Editors
 .vscode/
 .idea/
