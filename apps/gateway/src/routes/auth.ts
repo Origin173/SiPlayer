@@ -1,6 +1,9 @@
 import {
   LikeResultSchema,
+  OkDataSchema,
   PlaylistCollectionsSchema,
+  QrStartDataSchema,
+  QrStatusDataSchema,
   TrackPageSchema,
   TrackSchema,
   UserProfileSchema,
@@ -87,11 +90,11 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     try {
       const qr = await options.provider.startQr();
       const challenge = options.challenges.create(qr.upstreamKey, qr.expiresAt);
-      const data: QrStartData = {
+      const data: QrStartData = QrStartDataSchema.parse({
         challengeId: challenge.id,
         qrImageDataUrl: qr.qrImageDataUrl,
         expiresAt: qr.expiresAt,
-      };
+      });
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
@@ -105,7 +108,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     }
     const challenge = options.challenges.get(parsed.data.challengeId);
     if (!challenge) {
-      const data: QrStatusData = { status: 'EXPIRED' };
+      const data: QrStatusData = QrStatusDataSchema.parse({ status: 'EXPIRED' });
       return { data, requestId: requestId(request) };
     }
 
@@ -116,11 +119,11 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
         const user = UserProfileSchema.parse(await options.provider.getCurrentUser(status.cookie));
         const session = options.sessions.create(user, status.cookie);
         options.challenges.delete(challenge.id);
-        const data: QrStatusData = { status: 'AUTHORIZED', sessionToken: session.token, user };
+        const data: QrStatusData = QrStatusDataSchema.parse({ status: 'AUTHORIZED', sessionToken: session.token, user });
         return { data, requestId: requestId(request) };
       }
       if (status.status === 'EXPIRED') options.challenges.delete(challenge.id);
-      const data: QrStatusData = { status: status.status };
+      const data: QrStatusData = QrStatusDataSchema.parse({ status: status.status });
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
@@ -138,7 +141,7 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     const auth = getSession(request, options.sessions);
     if (isApiError(auth)) return sendError(reply, request, auth);
     options.sessions.revoke(auth.token);
-    const data: OkData = { ok: true };
+    const data: OkData = OkDataSchema.parse({ ok: true });
     return { data, requestId: requestId(request) };
   });
 
