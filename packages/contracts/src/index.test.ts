@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HealthResponseSchema, TrackSchema } from './index';
+import { CatalogSearchPageSchema, HealthResponseSchema, TrackSchema } from './index';
 
 describe('stable contracts', () => {
   it('accepts a normalized track without upstream fields', () => {
@@ -25,5 +25,17 @@ describe('stable contracts', () => {
     });
 
     expect(response.data.status).toBe('ok');
+  });
+
+  it('keeps catalog search item kinds from collapsing into one another', () => {
+    const page = CatalogSearchPageSchema.parse({
+      type: 'playlist',
+      items: [{ id: 'playlist-1', name: 'Focus', creator: null, trackCount: 3 }],
+      page: 1,
+      pageSize: 30,
+      hasMore: false,
+    });
+
+    expect(page.items[0]).toMatchObject({ id: 'playlist-1', creator: null, trackCount: 3 });
   });
 });

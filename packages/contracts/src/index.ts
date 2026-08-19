@@ -47,18 +47,17 @@ export const TrackSchema = z.object({
 });
 export type Track = z.infer<typeof TrackSchema>;
 
+const PlaylistCreatorSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  avatarUrl: z.string().url().nullable().optional(),
+});
+
 export const PlaylistSummarySchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   artworkUrl: z.string().url().nullable().optional(),
-  creator: z
-    .object({
-      id: z.string().min(1),
-      name: z.string(),
-      avatarUrl: z.string().url().nullable().optional(),
-    })
-    .nullable()
-    .optional(),
+  creator: PlaylistCreatorSchema.nullable().optional(),
   trackCount: z.number().int().nonnegative().nullable().optional(),
   description: z.string().nullable().optional(),
 });
@@ -185,7 +184,21 @@ export const TrackPageSchema = z.object({
 });
 export type TrackPage = z.infer<typeof TrackPageSchema>;
 
-export const CatalogSearchItemSchema = z.union([AlbumSummarySchema, ArtistSummarySchema, PlaylistSummarySchema]);
+const CatalogPlaylistSearchItemSchema = PlaylistSummarySchema.extend({ creator: PlaylistCreatorSchema.nullable() });
+const CatalogArtistSearchItemSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    avatarUrl: z.string().url().nullable().optional(),
+  })
+  .passthrough()
+  .refine((item) => !('artists' in item) && !('creator' in item));
+
+export const CatalogSearchItemSchema = z.union([
+  AlbumSummarySchema,
+  CatalogPlaylistSearchItemSchema,
+  CatalogArtistSearchItemSchema,
+]);
 export type CatalogSearchItem = z.infer<typeof CatalogSearchItemSchema>;
 
 export const CatalogSearchPageSchema = z.object({
