@@ -3,6 +3,7 @@ import type { AudioQuality } from '@siplayer/contracts';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
 import { ApiError } from '@/api/client';
 import { recordLocalTrack } from '@/features/localHistory';
+import { loadAppSettings, updateAppSettings } from '@/storage/appSettings';
 import { resolveStream } from './playbackResolver';
 import { nextQueueIndex } from './playbackModes';
 import type { PlayContext, PlaybackMode, QueueItem } from './playbackTypes';
@@ -51,6 +52,13 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       interruptionMode: 'doNotMix',
     }).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    void loadAppSettings().then((settings) => {
+      if (settings.playbackMode) setPlaybackMode(settings.playbackMode);
+      if (settings.quality) setPlaybackQuality(settings.quality);
+    });
+  }, [setPlaybackMode, setPlaybackQuality]);
 
   const resolveAndPlay = useCallback(
     async (item: QueueItem, isRetry = false) => {
@@ -230,12 +238,18 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const setQuality = useCallback(
     (quality: AudioQuality) => {
       setPlaybackQuality(quality);
+      void updateAppSettings({ quality });
       const state = usePlayerStore.getState();
       const item = state.queue[state.currentIndex];
       if (item) void resolveAndPlay(item);
     },
     [resolveAndPlay, setPlaybackQuality],
   );
+
+  const setMode = useCallback((mode: PlaybackMode) => {
+    setPlaybackMode(mode);
+    void updateAppSettings({ playbackMode: mode });
+  }, [setPlaybackMode]);
 
   const seekTo = useCallback(
     (positionMs: number) => {
@@ -290,10 +304,10 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       removeFromQueue,
       clearNext,
       clearQueue,
-      setMode: setPlaybackMode,
+      setMode,
       setQuality,
     }),
-    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, seekTo, setPlaybackMode, setPlayerQueue, setQuality, toggle],
+    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playTrack, previous, removeFromQueue, seekTo, setMode, setPlayerQueue, setQuality, toggle],
   );
 
   return <PlayerContext.Provider value={controller}>{children}</PlayerContext.Provider>;
