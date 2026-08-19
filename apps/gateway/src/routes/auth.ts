@@ -133,8 +133,12 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
   app.get('/v1/auth/me', async (request, reply) => {
     const auth = getSession(request, options.sessions);
     if (isApiError(auth)) return sendError(reply, request, auth);
-    const data: UserProfile = UserProfileSchema.parse(auth.session.user);
-    return { data, requestId: requestId(request) };
+    try {
+      const data: UserProfile = UserProfileSchema.parse(auth.session.user);
+      return { data, requestId: requestId(request) };
+    } catch (error) {
+      return sendError(reply, request, normalizeProviderError(error));
+    }
   });
 
   app.post('/v1/auth/logout', async (request, reply) => {
