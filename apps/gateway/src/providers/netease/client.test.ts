@@ -8,6 +8,13 @@ function clientWithPayload(payload: unknown): NeteaseApiClient {
   });
 }
 
+function clientWithStatus(status: number): NeteaseApiClient {
+  return new NeteaseApiClient({
+    baseUrl: 'http://upstream.test',
+    fetchImpl: async () => new Response('{}', { status }),
+  });
+}
+
 describe('NeteaseApiClient', () => {
   it('maps an upstream non-success code to a normalized provider error', async () => {
     await expect(clientWithPayload({ code: -1 }).get('/search', {}, (payload) => payload)).rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE' });
@@ -26,6 +33,11 @@ describe('NeteaseApiClient', () => {
   it('does not treat a public upstream 301 response as a session expiry', async () => {
     await expect(clientWithPayload({ code: 301, message: '需要登录' }).get('/search', {}, (payload) => payload))
       .rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE', retryable: true });
+  });
+
+  it('maps an upstream 429 response to the contract rate-limit error', async () => {
+    await expect(clientWithStatus(429).get('/search', {}, (payload) => payload))
+      .rejects.toMatchObject({ code: 'RATE_LIMITED', retryable: true, status: 429 });
   });
 
   it('reports upstream duration and outcome without including query values', async () => {

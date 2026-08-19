@@ -4,7 +4,8 @@ export type NeteaseProviderErrorCode =
   | 'NOT_FOUND'
   | 'AUTH_REQUIRED'
   | 'AUTH_EXPIRED'
-  | 'TRACK_UNAVAILABLE';
+  | 'TRACK_UNAVAILABLE'
+  | 'RATE_LIMITED';
 
 export class NeteaseProviderError extends Error {
   readonly code: NeteaseProviderErrorCode;

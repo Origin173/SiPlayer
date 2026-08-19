@@ -74,6 +74,9 @@ export class NeteaseApiClient {
       const payload: unknown = await response.json().catch(() => null);
       statusCode = response.status;
       if (!response.ok) {
+        if (response.status === 429) {
+          throw new NeteaseProviderError('RATE_LIMITED', 'Music service rate limit exceeded.', true, response.status);
+        }
         if (cookieOverride && (response.status === 401 || response.status === 403)) {
           throw new NeteaseProviderError('AUTH_EXPIRED', 'The upstream login session has expired.', false, response.status);
         }

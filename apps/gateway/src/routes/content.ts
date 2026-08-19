@@ -44,6 +44,8 @@ function errorStatus(code: ApiError['code']): number {
       return 401;
     case 'UPSTREAM_UNAVAILABLE':
       return 502;
+    case 'RATE_LIMITED':
+      return 429;
     case 'TRACK_UNAVAILABLE':
     case 'QUALITY_UNAVAILABLE':
       return 422;

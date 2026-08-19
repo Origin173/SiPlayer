@@ -50,6 +50,8 @@ function errorStatus(code: ApiError['code']): number {
       return 504;
     case 'UPSTREAM_UNAVAILABLE':
       return 502;
+    case 'RATE_LIMITED':
+      return 429;
     case 'VALIDATION_ERROR':
       return 400;
     default:

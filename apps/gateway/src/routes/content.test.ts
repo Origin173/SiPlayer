@@ -156,6 +156,24 @@ describe('content routes', () => {
     expect(body.requestId).toMatch(/^req_/);
   });
 
+  it('returns the contract rate-limit status for an upstream 429', async () => {
+    const limitedApp = buildApp(loadConfig({ NODE_ENV: 'test' }), {
+      logger: false,
+      provider: {
+        ...provider,
+        searchTracks: async () => {
+          throw new NeteaseProviderError('RATE_LIMITED', 'Music service rate limit exceeded.', true, 429);
+        },
+      },
+    });
+    const response = await limitedApp.inject({ method: 'GET', url: '/v1/search?q=test' });
+    const body = response.json<{ error: { code: string; retryable: boolean } }>();
+    await limitedApp.close();
+
+    expect(response.statusCode).toBe(429);
+    expect(body.error).toMatchObject({ code: 'RATE_LIMITED', retryable: true });
+  });
+
   it('maps an expired upstream session to a stable unauthorized response', async () => {
     const expiredApp = buildApp(loadConfig({ NODE_ENV: 'test' }), {
       logger: false,
