@@ -52,11 +52,60 @@ pnpm dlx eas-cli@latest build --platform android --profile release
 pnpm dlx eas-cli@latest build --platform ios --profile release
 ```
 
-然后在 GitHub 仓库的 Settings → Secrets and variables → Actions 中配置：
+### GitHub Actions 配置项
 
-- Secret `EXPO_TOKEN`：Expo Personal Access Token。
-- Variable `EXPO_PROJECT_ID`：EAS 项目的 UUID，对应 `extra.eas.projectId`。
-- Variable `EXPO_PUBLIC_GATEWAY_URL`：正式 Gateway 的 HTTPS 地址。
+在 GitHub 仓库进入 `Settings → Secrets and variables → Actions`。当前工作流只需要添加下面 1 个 Secret 和 2 个 Variable：
+
+| 类型 | 名称 | 值 | 用途 |
+| --- | --- | --- | --- |
+| Secret | `EXPO_TOKEN` | Expo Personal Access Token | 让 GitHub Actions 登录 EAS 并发起云构建 |
+| Variable | `EXPO_PROJECT_ID` | EAS 项目的 UUID | 指定 `siplayer` 对应的 Expo/EAS 项目 |
+| Variable | `EXPO_PUBLIC_GATEWAY_URL` | 正式 Gateway 的 HTTPS 地址，例如 `https://api.example.com` | 编译时写入 App 的后端 API 地址 |
+
+#### 必须添加的 Secret：`EXPO_TOKEN`
+
+在 Expo 控制台创建 Personal Access Token，然后将完整 token 粘贴到 GitHub 的 **Secrets** → **New repository secret**：
+
+```text
+Name:  EXPO_TOKEN
+Value: <Expo Personal Access Token>
+```
+
+Token 只放在 GitHub Secret 中，不要写入 `eas.json`、`.env`、App 源码或提交记录。不要把 `EXPO_PROJECT_ID` 和 `EXPO_PUBLIC_GATEWAY_URL` 错误地放到 Secret 中；它们是非敏感的构建配置，应放在 **Variables** → **New repository variable**。
+
+#### 两个必须添加的 Variable
+
+```text
+Name:  EXPO_PROJECT_ID
+Value: <Expo/EAS project UUID>
+```
+
+```text
+Name:  EXPO_PUBLIC_GATEWAY_URL
+Value: https://你的-gateway-域名.example.com
+```
+
+`EXPO_PUBLIC_GATEWAY_URL` 会被打包进客户端，因此它不是密码。它必须是手机可以访问的公网 HTTPS 地址，不能使用 `127.0.0.1`、`localhost` 或仅在服务器内部可访问的地址。修改这个 Variable 后，必须重新创建一个 tag 并重新构建 APK/IPA，已经下载的安装包不会自动更新。
+
+#### 当前不需要添加的配置
+
+- `GITHUB_TOKEN`：GitHub Actions 自动提供，工作流用于创建 Release 和回写 changelog，不需要手动创建。
+- Android keystore、iOS distribution certificate、provisioning profile：由 EAS Credentials 托管，不要复制到 GitHub Secret。首次本地 EAS 构建时按提示完成凭据配置。
+- `APPLE_ID`、`ASC_API_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY`：当前工作流只构建并上传 IPA 到 GitHub Release，不执行 TestFlight/App Store 提交，因此暂时不需要。以后增加 `eas submit` 时再单独配置。
+- `NETEASE_API_BASE_URL`、`SESSION_ENCRYPTION_KEY`、`SESSION_STORE_PATH`：这些是 Gateway 服务器环境变量，不应写进 App 构建配置，也不应暴露给移动端。
+
+配置完成后可使用 GitHub CLI 更新地址：
+
+```powershell
+gh variable set EXPO_PUBLIC_GATEWAY_URL --body "https://你的-gateway-域名.example.com"
+```
+
+然后创建新的发布 tag：
+
+```powershell
+git tag v0.1.0-alpha.2
+git push origin v0.1.0-alpha.2
+```
 
 EAS 负责保存 Android keystore 和 iOS signing credentials；不要把证书、私钥或 token 提交到仓库。GitHub Actions 只通过 `EXPO_TOKEN` 触发云构建。
 
