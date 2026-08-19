@@ -6,7 +6,7 @@ import { useAuth } from '@/auth';
 import { useRecentTracks, useUserPlaylists } from '@/api/hooks';
 import { AppCard, Button, EmptyState, ErrorState, IconButton, Screen, Skeleton } from '@/components/ui';
 import { PlaylistCard, SongRow } from '@/components/music';
-import { loadLocalHistory } from '@/features/localHistory';
+import { loadLocalHistory, subscribeLocalHistory } from '@/features/localHistory';
 import { queueItemFromTrack } from '@/player/playbackTypes';
 import type { Track } from '@siplayer/contracts';
 import { usePlayer } from '@/player';
@@ -30,7 +30,11 @@ export default function HomeScreen() {
   }, [playlistsQuery.data]);
 
   useEffect(() => {
-    void loadLocalHistory().then(setLocalHistory);
+    const reload = () => {
+      void loadLocalHistory().then(setLocalHistory);
+    };
+    reload();
+    return subscribeLocalHistory(reload);
   }, []);
 
   const playTrack = (trackId: string) => {

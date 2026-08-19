@@ -3,6 +3,16 @@ import { TrackSchema, type Track } from '@siplayer/contracts';
 
 const historyFile = new File(Paths.document, 'siplayer-local-history.json');
 const MAX_HISTORY = 50;
+const listeners = new Set<() => void>();
+
+export function subscribeLocalHistory(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function notifyLocalHistoryChanged(): void {
+  for (const listener of listeners) listener();
+}
 
 export async function loadLocalHistory(): Promise<Track[]> {
   try {
@@ -21,6 +31,7 @@ export async function recordLocalTrack(track: Track): Promise<void> {
   try {
     if (!historyFile.exists) historyFile.create({ overwrite: true });
     historyFile.write(JSON.stringify(next));
+    notifyLocalHistoryChanged();
   } catch {
     // Local history is a best-effort fallback and never blocks playback.
   }

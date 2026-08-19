@@ -5,7 +5,7 @@ import { useAuth } from '@/auth';
 import { useLikedTracks, useRecentTracks, useUserPlaylists } from '@/api/hooks';
 import { PlaylistCard, SongRow } from '@/components/music';
 import { AppCard, Button, EmptyState, ErrorState, Screen, Skeleton } from '@/components/ui';
-import { loadLocalHistory } from '@/features/localHistory';
+import { loadLocalHistory, subscribeLocalHistory } from '@/features/localHistory';
 import { queueItemFromTrack } from '@/player/playbackTypes';
 import { usePlayer } from '@/player';
 import { useTheme } from '@/theme';
@@ -26,7 +26,11 @@ export default function LibraryScreen() {
   }, [cloudRecent.data?.items, localHistory]);
 
   useEffect(() => {
-    void loadLocalHistory().then(setLocalHistory);
+    const reload = () => {
+      void loadLocalHistory().then(setLocalHistory);
+    };
+    reload();
+    return subscribeLocalHistory(reload);
   }, []);
 
   return (
