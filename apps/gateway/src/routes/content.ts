@@ -33,6 +33,8 @@ function errorStatus(code: ApiError['code']): number {
       return 404;
     case 'UPSTREAM_TIMEOUT':
       return 504;
+    case 'AUTH_EXPIRED':
+      return 401;
     case 'UPSTREAM_UNAVAILABLE':
       return 502;
     case 'TRACK_UNAVAILABLE':

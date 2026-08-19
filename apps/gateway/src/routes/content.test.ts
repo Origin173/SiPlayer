@@ -102,4 +102,22 @@ describe('content routes', () => {
     expect(body.error).toEqual({ code: 'UPSTREAM_TIMEOUT', message: 'Music service took too long to respond.', retryable: true });
     expect(body.requestId).toMatch(/^req_/);
   });
+
+  it('maps an expired upstream session to a stable unauthorized response', async () => {
+    const expiredApp = buildApp(loadConfig({ NODE_ENV: 'test' }), {
+      logger: false,
+      provider: {
+        ...provider,
+        getTrack: async () => {
+          throw new NeteaseProviderError('AUTH_EXPIRED', 'The upstream login session has expired.', false, 401);
+        },
+      },
+    });
+    const response = await expiredApp.inject({ method: 'GET', url: '/v1/tracks/track-1' });
+    const body = response.json<{ error: { code: string; retryable: boolean } }>();
+    await expiredApp.close();
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toEqual({ code: 'AUTH_EXPIRED', message: 'The upstream login session has expired.', retryable: false });
+  });
 });

@@ -13,6 +13,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function isAuthExpiredResponse(payload: unknown): boolean {
+  if (!isRecord(payload)) return false;
+  const code = payload.code;
+  if (code === 301 || code === 401) return true;
+  const message = [payload.message, payload.msg].filter((value): value is string => typeof value === 'string').join(' ').toLowerCase();
+  return message.includes('登录') || message.includes('login') || message.includes('unauthorized');
+}
+
 export class NeteaseApiClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -52,9 +60,15 @@ export class NeteaseApiClient {
 
       const payload: unknown = await response.json().catch(() => null);
       if (!response.ok) {
+        if (cookieOverride && (response.status === 401 || response.status === 403)) {
+          throw new NeteaseProviderError('AUTH_EXPIRED', 'The upstream login session has expired.', false, response.status);
+        }
         throw new NeteaseProviderError('UPSTREAM_UNAVAILABLE', 'Music service is temporarily unavailable.', true, response.status);
       }
       if (isRecord(payload) && typeof payload.code === 'number' && !acceptedCodes.includes(payload.code)) {
+        if (cookieOverride && isAuthExpiredResponse(payload)) {
+          throw new NeteaseProviderError('AUTH_EXPIRED', 'The upstream login session has expired.', false, response.status);
+        }
         throw new NeteaseProviderError('UPSTREAM_UNAVAILABLE', 'Music service rejected the request.', true, response.status);
       }
 

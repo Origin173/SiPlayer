@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyServerOptions } from 'fastify';
 import {
   type ErrorEnvelope,
   HealthResponseSchema,
@@ -15,10 +15,24 @@ export interface BuildAppOptions {
   logger?: FastifyServerOptions['logger'];
   provider?: ContentProvider;
   authProvider?: AuthProvider;
+  readinessProbe?: () => Promise<boolean>;
 }
 
 function requestId(value: string | number): string {
   return String(value);
+}
+
+async function probeUpstream(baseUrl: string, timeoutMs = 2_000): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    await fetch(`${baseUrl.replace(/\/$/, '')}/`, { signal: controller.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export function buildApp(
@@ -61,6 +75,15 @@ export function buildApp(
   });
 
   const rateBuckets = new Map<string, { startedAt: number; count: number }>();
+  const rateBucketCleanup = setInterval(() => {
+    const now = Date.now();
+    for (const [key, bucket] of rateBuckets) {
+      if (now - bucket.startedAt >= config.RATE_LIMIT_WINDOW_MS) rateBuckets.delete(key);
+    }
+  }, config.RATE_LIMIT_WINDOW_MS);
+  rateBucketCleanup.unref?.();
+  app.addHook('onClose', async () => clearInterval(rateBucketCleanup));
+
   app.addHook('onRequest', async (request, reply) => {
     const path = request.url.split('?')[0];
     if (path === '/health' || path === '/v1/health' || path === '/ready' || path === '/v1/ready') return;
@@ -93,16 +116,19 @@ export function buildApp(
     return HealthResponseSchema.parse(response);
   };
 
-  const readyHandler = async (request: { id: string | number }) => {
+  const readinessProbe = options.readinessProbe ?? (() => probeUpstream(config.NETEASE_API_BASE_URL));
+  const readyHandler = async (request: { id: string | number }, reply: FastifyReply) => {
+    const upstreamAvailable = await readinessProbe().catch(() => false);
     const response = {
       data: {
         status: 'ready' as const,
-        upstream: config.NETEASE_API_BASE_URL ? ('configured' as const) : ('unavailable' as const),
+        upstream: upstreamAvailable ? ('available' as const) : ('unavailable' as const),
       },
       requestId: requestId(request.id),
     };
 
-    return ReadyResponseSchema.parse(response);
+    const parsed = ReadyResponseSchema.parse(response);
+    return upstreamAvailable ? parsed : reply.status(503).send(parsed);
   };
 
   app.get('/v1/health', healthHandler);

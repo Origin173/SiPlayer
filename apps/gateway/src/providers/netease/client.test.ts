@@ -17,4 +17,14 @@ describe('NeteaseApiClient', () => {
     const result = await clientWithPayload({ code: 801 }).get('/login/qr/check', {}, (payload) => payload, undefined, [800, 801, 802, 803]);
     expect(result).toEqual({ code: 801 });
   });
+
+  it('maps an authenticated upstream 301 response to session expiry', async () => {
+    await expect(clientWithPayload({ code: 301, message: '需要登录' }).get('/user/playlist', {}, (payload) => payload, 'MUSIC_U=expired'))
+      .rejects.toMatchObject({ code: 'AUTH_EXPIRED', retryable: false });
+  });
+
+  it('does not treat a public upstream 301 response as a session expiry', async () => {
+    await expect(clientWithPayload({ code: 301, message: '需要登录' }).get('/search', {}, (payload) => payload))
+      .rejects.toMatchObject({ code: 'UPSTREAM_UNAVAILABLE', retryable: true });
+  });
 });

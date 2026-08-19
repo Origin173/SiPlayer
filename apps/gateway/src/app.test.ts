@@ -37,12 +37,25 @@ describe('gateway foundation routes', () => {
   });
 
   it('returns readiness without exposing upstream internals', async () => {
-    const response = await app.inject({ method: 'GET', url: '/v1/ready' });
+    const readyApp = buildApp(loadConfig({ NODE_ENV: 'test' }), { logger: false, readinessProbe: async () => true });
+    const response = await readyApp.inject({ method: 'GET', url: '/v1/ready' });
     const body = response.json<{ data: { status: string; upstream: string } }>();
+    await readyApp.close();
 
     expect(response.statusCode).toBe(200);
     expect(body.data.status).toBe('ready');
-    expect(body.data.upstream).toBe('configured');
+    expect(body.data.upstream).toBe('available');
+  });
+
+  it('reports an unavailable upstream with a non-ready status', async () => {
+    const unavailableApp = buildApp(loadConfig({ NODE_ENV: 'test' }), { logger: false, readinessProbe: async () => false });
+    const response = await unavailableApp.inject({ method: 'GET', url: '/v1/ready' });
+    const body = response.json<{ data: { status: string; upstream: string } }>();
+    await unavailableApp.close();
+
+    expect(response.statusCode).toBe(503);
+    expect(body.data.status).toBe('ready');
+    expect(body.data.upstream).toBe('unavailable');
   });
 
   it('rate limits non-health requests while keeping health available', async () => {
