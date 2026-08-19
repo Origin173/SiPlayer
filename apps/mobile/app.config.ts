@@ -1,6 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
 const gatewayUrl = process.env.EXPO_PUBLIC_GATEWAY_URL ?? 'http://127.0.0.1:8787';
+const easProjectId = process.env.EXPO_PROJECT_ID ?? process.env.EAS_PROJECT_ID;
 
 const config: ExpoConfig = {
   name: 'SiPlayer',
@@ -33,6 +34,7 @@ const config: ExpoConfig = {
   },
   extra: {
     gatewayUrl,
+    ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
   },
 };
 

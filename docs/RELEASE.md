@@ -36,6 +36,30 @@ git push origin v0.1.0
 
 提交信息建议使用 Conventional Commits，例如 `feat: ...`、`fix: ...`、`perf: ...`、`refactor: ...`。更新日志会按这些前缀分组；无法识别的提交进入 Other changes。
 
-当前产物是 Gateway 编译目录和 Expo JavaScript export，不是签名的 `.apk`、`.aab` 或 `.ipa`。商店包需要后续接入 EAS Build、签名证书和商店凭据，不能由当前 `expo export` 代替。
+## 原生 APK / IPA 构建
+
+工作流会在质量门禁通过后使用 EAS Build 云构建两个原生包：
+
+- Android：`siplayer-vX.Y.Z-android.apk`，明确使用 APK 格式，可下载到 Android 设备直接安装。
+- iOS：`siplayer-vX.Y.Z-ios.ipa`，使用 Apple store distribution 签名，可下载并提交到 TestFlight/App Store。
+
+首次启用前需要在本地完成一次 EAS 项目初始化和凭据配置：
+
+```powershell
+pnpm dlx eas-cli@latest login
+pnpm dlx eas-cli@latest init
+pnpm dlx eas-cli@latest build --platform android --profile release
+pnpm dlx eas-cli@latest build --platform ios --profile release
+```
+
+然后在 GitHub 仓库的 Settings → Secrets and variables → Actions 中配置：
+
+- Secret `EXPO_TOKEN`：Expo Personal Access Token。
+- Variable `EXPO_PROJECT_ID`：EAS 项目的 UUID，对应 `extra.eas.projectId`。
+- Variable `EXPO_PUBLIC_GATEWAY_URL`：正式 Gateway 的 HTTPS 地址。
+
+EAS 负责保存 Android keystore 和 iOS signing credentials；不要把证书、私钥或 token 提交到仓库。GitHub Actions 只通过 `EXPO_TOKEN` 触发云构建。
+
+注意：Android APK 可以直接下载安装（设备可能需要允许安装未知来源应用）。普通 iOS 用户不能仅凭下载的 IPA 直接安装；IPA 必须通过 TestFlight/App Store，或使用 Ad Hoc/Enterprise 签名并满足 Apple 的设备注册/企业分发条件。这是 Apple 的分发限制，不是 CI 能绕过的限制。
 
 发布成功后的 changelog 回写需要仓库允许 `github-actions[bot]` 使用 `GITHUB_TOKEN` 写入默认分支；如果默认分支启用了禁止 Actions 直接 push 的保护规则，应将该 job 改为创建 Pull Request。

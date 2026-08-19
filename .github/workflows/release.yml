@@ -13,13 +13,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build and publish release
+  quality:
+    name: Validate and package JavaScript release
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       RELEASE_TAG: ${{ github.ref_name }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout tagged source
         uses: actions/checkout@v4
@@ -49,14 +48,158 @@ jobs:
           pnpm typecheck
           pnpm test
 
-      - name: Build Gateway and Mobile exports
+      - name: Build Gateway and Expo export
         run: pnpm build
 
       - name: Generate release notes
         run: node scripts/release/generate-changelog.mjs --tag "$RELEASE_TAG" --output release-notes.md
 
-      - name: Package release artifacts
+      - name: Package JavaScript release artifacts
         run: node scripts/release/package-artifacts.mjs
+
+      - name: Upload JavaScript release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-package-${{ github.ref_name }}
+          path: release-artifacts
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-${{ github.ref_name }}
+          path: release-notes.md
+          if-no-files-found: error
+          retention-days: 14
+
+  native-build:
+    name: Build ${{ matrix.platform }} binary with EAS
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android
+            extension: apk
+          - platform: ios
+            extension: ipa
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PROJECT_ID: ${{ vars.EXPO_PROJECT_ID }}
+      EXPO_PUBLIC_GATEWAY_URL: ${{ vars.EXPO_PUBLIC_GATEWAY_URL }}
+      ARTIFACT_EXTENSION: ${{ matrix.extension }}
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate native build inputs
+        shell: bash
+        run: |
+          if [[ -z "${EXPO_TOKEN:-}" ]]; then
+            echo "::error::Missing EXPO_TOKEN GitHub Secret"
+            exit 1
+          fi
+          if [[ -z "${EXPO_PROJECT_ID:-}" ]]; then
+            echo "::error::Missing EXPO_PROJECT_ID GitHub Variable"
+            exit 1
+          fi
+          if [[ -z "${EXPO_PUBLIC_GATEWAY_URL:-}" ]]; then
+            echo "::error::Missing EXPO_PUBLIC_GATEWAY_URL GitHub Variable"
+            exit 1
+          fi
+
+      - name: Inject public runtime configuration into EAS profile
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; const path = 'eas.json'; const config = JSON.parse(fs.readFileSync(path, 'utf8')); config.build.release.env = { ...(config.build.release.env ?? {}), EXPO_PUBLIC_GATEWAY_URL: process.env.EXPO_PUBLIC_GATEWAY_URL }; fs.writeFileSync(path, JSON.stringify(config, null, 2) + '\\n');"
+
+      - name: Validate EAS project configuration
+        run: eas config --platform "${{ matrix.platform }}" --profile release --non-interactive
+
+      - name: Build signed native binary on EAS
+        run: |
+          eas build \
+            --platform "${{ matrix.platform }}" \
+            --profile release \
+            --message "SiPlayer ${RELEASE_TAG}" \
+            --non-interactive \
+            --wait \
+            --json > "$RUNNER_TEMP/eas-build.json"
+
+      - name: Download native binary from EAS
+        shell: bash
+        run: |
+          build_url="$(jq -r 'if type == "array" then .[0].artifacts.buildUrl // empty else .artifacts.buildUrl // empty end' "$RUNNER_TEMP/eas-build.json")"
+          if [[ -z "$build_url" ]]; then
+            echo "::error::EAS did not return a build artifact URL"
+            cat "$RUNNER_TEMP/eas-build.json"
+            exit 1
+          fi
+          mkdir -p release-artifacts
+          output="release-artifacts/siplayer-${RELEASE_TAG}-${{ matrix.platform }}.${ARTIFACT_EXTENSION}"
+          curl --fail --location --retry 3 --retry-delay 5 "$build_url" --output "$output"
+          test -s "$output"
+
+      - name: Upload native binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.platform }}-${{ github.ref_name }}
+          path: release-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish GitHub Release with native binaries
+    needs: [quality, native-build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download JavaScript release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-package-${{ github.ref_name }}
+          path: release-artifacts
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes-${{ github.ref_name }}
+          path: .
+
+      - name: Download native binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*-${{ github.ref_name }}
+          path: release-artifacts
+          merge-multiple: true
 
       - name: Create or update GitHub Release
         shell: bash
@@ -73,8 +216,8 @@ jobs:
 
   update-changelog:
     name: Update repository changelog
-    needs: release
-    if: needs.release.result == 'success'
+    needs: publish
+    if: needs.publish.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
