@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -31,6 +31,26 @@ describe('session stores', () => {
       expect(persisted).not.toContain('upstream-secret');
       expect(second.get(created.token)).toMatchObject({ user, cookie: 'MUSIC_U=upstream-secret' });
       expect(readdirSync(directory).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('recovers from a corrupt primary file using the previous encrypted backup', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'siplayer-session-'));
+    const path = join(directory, 'sessions.json');
+    const errors: unknown[] = [];
+    try {
+      const first = new SessionStore('a-test-secret-that-is-long-enough', 60_000, path);
+      const original = first.create(user, 'MUSIC_U=first-secret');
+      first.create({ ...user, id: 'user-2' }, 'MUSIC_U=second-secret');
+      writeFileSync(path, '{corrupt', 'utf8');
+
+      const recovered = new SessionStore('a-test-secret-that-is-long-enough', 60_000, path, (error) => errors.push(error));
+
+      expect(recovered.get(original.token)).toMatchObject({ user, cookie: 'MUSIC_U=first-secret' });
+      expect(readFileSync(`${path}.bak`, 'utf8')).not.toContain('first-secret');
+      expect(errors.length).toBeGreaterThan(0);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

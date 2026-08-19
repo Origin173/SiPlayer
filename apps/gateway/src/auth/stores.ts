@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { UserProfile } from '@siplayer/contracts';
 
@@ -59,35 +59,48 @@ export class SessionStore {
   private readonly key: Buffer;
   private readonly ttlMs: number;
   private readonly persistencePath?: string;
+  private readonly backupPath?: string;
   private readonly onPersistenceError?: PersistenceErrorHandler;
+  private loadedFromBackup = false;
 
   constructor(secret: string, ttlMs: number, persistencePath?: string, onPersistenceError?: PersistenceErrorHandler) {
     this.key = encryptionKey(secret);
     this.ttlMs = ttlMs;
     this.persistencePath = persistencePath;
+    this.backupPath = persistencePath ? `${persistencePath}.bak` : undefined;
     this.onPersistenceError = onPersistenceError;
     this.load();
   }
 
+  private restore(parsed: unknown): boolean {
+    if (!Array.isArray(parsed)) return false;
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue;
+      const value = item as Partial<StoredSession> & { tokenHash?: unknown };
+      if (typeof value.tokenHash !== 'string' || typeof value.encryptedCookie !== 'string' || typeof value.expiresAtMs !== 'number' || !value.user) continue;
+      this.sessions.set(value.tokenHash, {
+        user: value.user,
+        encryptedCookie: value.encryptedCookie,
+        expiresAtMs: value.expiresAtMs,
+      });
+    }
+    return true;
+  }
+
   private load(): void {
     if (!this.persistencePath) return;
-    try {
-      const parsed: unknown = JSON.parse(readFileSync(this.persistencePath, 'utf8'));
-      if (!Array.isArray(parsed)) return;
-      for (const item of parsed) {
-        if (!item || typeof item !== 'object') continue;
-        const value = item as Partial<StoredSession> & { tokenHash?: unknown };
-        if (typeof value.tokenHash !== 'string' || typeof value.encryptedCookie !== 'string' || typeof value.expiresAtMs !== 'number' || !value.user) continue;
-        this.sessions.set(value.tokenHash, {
-          user: value.user,
-          encryptedCookie: value.encryptedCookie,
-          expiresAtMs: value.expiresAtMs,
-        });
+    for (const [index, path] of [this.persistencePath, this.backupPath].entries()) {
+      if (!path) continue;
+      try {
+        const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'));
+        if (!this.restore(parsed)) throw new Error(`Invalid session store format: ${path}`);
+        this.loadedFromBackup = index === 1;
+        this.pruneExpired(false);
+        return;
+      } catch (error) {
+        // A missing or corrupt session file must not prevent the gateway from booting.
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.onPersistenceError?.(error);
       }
-      this.pruneExpired(false);
-    } catch (error) {
-      // A missing or corrupt session file must not prevent the gateway from booting.
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.onPersistenceError?.(error);
     }
   }
 
@@ -96,9 +109,17 @@ export class SessionStore {
     const temporaryPath = `${this.persistencePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
       mkdirSync(dirname(this.persistencePath), { recursive: true });
+      if (this.backupPath && !this.loadedFromBackup) {
+        try {
+          copyFileSync(this.persistencePath, this.backupPath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.onPersistenceError?.(error);
+        }
+      }
       const entries = [...this.sessions.entries()].map(([tokenHash, session]) => ({ tokenHash, ...session }));
       writeFileSync(temporaryPath, JSON.stringify(entries), { encoding: 'utf8', mode: 0o600 });
       renameSync(temporaryPath, this.persistencePath);
+      this.loadedFromBackup = false;
     } catch (error) {
       // Session persistence is best effort; the in-memory store remains authoritative for this process.
       try {
