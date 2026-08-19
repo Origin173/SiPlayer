@@ -9,6 +9,9 @@ coverage/
 *.log
 .DS_Store
 
+# Local usage notes
+test.md
+
 # Local development caches live on D: as required by the project.
 .tmp/
 
