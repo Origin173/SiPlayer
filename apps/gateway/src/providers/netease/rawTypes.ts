@@ -20,6 +20,21 @@ export const RawAlbumSchema = z.object({
 }).passthrough();
 export type RawAlbum = z.infer<typeof RawAlbumSchema>;
 
+export const RawSearchPlaylistSchema = z.object({
+  id: NumericIdSchema,
+  name: z.string().default(''),
+  coverImgUrl: z.string().nullable().optional(),
+  picUrl: z.string().nullable().optional(),
+  creator: z.object({
+    userId: NumericIdSchema,
+    nickname: z.string().default(''),
+    avatarUrl: z.string().nullable().optional(),
+  }).nullable().optional(),
+  trackCount: z.number().nullable().optional(),
+  description: z.string().nullable().optional(),
+}).passthrough();
+export type RawSearchPlaylist = z.infer<typeof RawSearchPlaylistSchema>;
+
 export const RawPrivilegeSchema = z.object({
   id: NumericIdSchema.optional(),
   pl: z.number().nullable().optional(),
@@ -49,6 +64,12 @@ export const RawSearchResponseSchema = z.object({
   result: z.object({
     songCount: z.number().nullable().optional(),
     songs: z.array(RawSongSchema).default([]),
+    albums: z.array(RawAlbumSchema).default([]),
+    artists: z.array(RawArtistSchema).default([]),
+    playlists: z.array(RawSearchPlaylistSchema).default([]),
+    albumCount: z.number().nullable().optional(),
+    artistCount: z.number().nullable().optional(),
+    playlistCount: z.number().nullable().optional(),
     more: z.boolean().optional(),
   }).optional(),
 }).passthrough();

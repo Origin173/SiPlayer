@@ -69,16 +69,10 @@ export function registerContentRoutes(app: FastifyInstance, options: ContentRout
         retryable: false,
       });
     }
-    if (parsed.data.type !== 'track') {
-      return sendError(reply, request, {
-        code: 'VALIDATION_ERROR',
-        message: 'Only track search is available in this release.',
-        retryable: false,
-      });
-    }
-
     try {
-      const data = await options.provider.searchTracks(parsed.data.q, parsed.data.page, parsed.data.pageSize);
+      const data = parsed.data.type === 'track'
+        ? await options.provider.searchTracks(parsed.data.q, parsed.data.page, parsed.data.pageSize)
+        : await options.provider.searchCatalog(parsed.data.q, parsed.data.type, parsed.data.page, parsed.data.pageSize);
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));

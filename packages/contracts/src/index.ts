@@ -185,6 +185,18 @@ export const TrackPageSchema = z.object({
 });
 export type TrackPage = z.infer<typeof TrackPageSchema>;
 
+export const CatalogSearchItemSchema = z.union([AlbumSummarySchema, ArtistSummarySchema, PlaylistSummarySchema]);
+export type CatalogSearchItem = z.infer<typeof CatalogSearchItemSchema>;
+
+export const CatalogSearchPageSchema = z.object({
+  type: z.enum(['album', 'artist', 'playlist']),
+  items: z.array(CatalogSearchItemSchema),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+  hasMore: z.boolean(),
+});
+export type CatalogSearchPage = z.infer<typeof CatalogSearchPageSchema>;
+
 export const QrStartDataSchema = z.object({
   challengeId: z.string().min(1),
   qrImageDataUrl: z.string().startsWith('data:image/'),

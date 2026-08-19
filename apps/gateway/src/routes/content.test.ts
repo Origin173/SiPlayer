@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import type { AudioQuality, Lyrics, PlaylistDetail, StreamInfo, Track, TrackPage } from '@siplayer/contracts';
+import type { AudioQuality, CatalogSearchPage, Lyrics, PlaylistDetail, StreamInfo, Track, TrackPage } from '@siplayer/contracts';
 import { buildApp } from '../app';
 import { NeteaseProviderError, type ContentProvider } from '../providers';
 import { loadConfig } from '../config/env';
@@ -17,6 +17,7 @@ const track: Track = {
 
 const provider: ContentProvider = {
   searchTracks: async (): Promise<TrackPage> => ({ items: [track], page: 1, pageSize: 30, hasMore: false }),
+  searchCatalog: async (_query, type): Promise<CatalogSearchPage> => ({ type, items: [], page: 1, pageSize: 30, hasMore: false }),
   getTrack: async () => track,
   getLyrics: async (): Promise<Lyrics> => ({ type: 'NONE', lines: [] }),
   getPlaylist: async (): Promise<PlaylistDetail> => ({ id: 'playlist-1', name: 'Focus', tracks: [] }),
@@ -42,6 +43,15 @@ describe('content routes', () => {
     expect(response.statusCode).toBe(200);
     expect(body.data.items[0]?.artistText).toBe('Origin');
     expect(body.requestId).toMatch(/^req_/);
+  });
+
+  it('supports normalized catalog search types', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/search?q=quiet&type=album' });
+    const body = response.json<{ data: CatalogSearchPage }>();
+
+    expect(response.statusCode).toBe(200);
+    expect(body.data.type).toBe('album');
+    expect(body.data.items).toEqual([]);
   });
 
   it('does not accept arbitrary upstream parameters', async () => {

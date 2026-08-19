@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import type {
   AudioQuality,
+  CatalogSearchPage,
   Lyrics,
   PlaylistCollections,
   PlaylistDetail,
@@ -30,6 +31,7 @@ const playlists: PlaylistCollections = { created: [], subscribed: [] };
 let pollCount = 0;
 const provider: ContentProvider = {
   searchTracks: async (): Promise<TrackPage> => ({ items: [track], page: 1, pageSize: 30, hasMore: false }),
+  searchCatalog: async (_query, type): Promise<CatalogSearchPage> => ({ type, items: [], page: 1, pageSize: 30, hasMore: false }),
   getTrack: async () => track,
   getLyrics: async (): Promise<Lyrics> => ({ type: 'NONE', lines: [] }),
   getPlaylist: async (): Promise<PlaylistDetail> => ({ id: 'playlist-1', name: 'Focus', tracks: [] }),

@@ -1,4 +1,4 @@
-import type { AudioQuality, Lyrics, PlaylistCollections, PlaylistDetail, PlaylistSummary, StreamInfo, Track, TrackPage, UserProfile } from '@siplayer/contracts';
+import type { AudioQuality, CatalogSearchPage, Lyrics, PlaylistCollections, PlaylistDetail, PlaylistSummary, StreamInfo, Track, TrackPage, UserProfile } from '@siplayer/contracts';
 import { NeteaseApiClient } from './client';
 import { neteaseEndpoints } from './endpoints';
 import { NeteaseProviderError } from './errors';
@@ -14,6 +14,7 @@ import {
 } from './authRawTypes';
 import { mapPlaylistSummary, mapRecentTracks, mapUserProfile } from './authMapper';
 import {
+  mapCatalogSearchResponse,
   mapDetailTrack,
   mapLyrics,
   mapPlaylist,
@@ -31,6 +32,7 @@ import {
 
 export interface ContentProvider {
   searchTracks: (keyword: string, page: number, pageSize: number) => Promise<TrackPage>;
+  searchCatalog: (keyword: string, type: 'album' | 'artist' | 'playlist', page: number, pageSize: number) => Promise<CatalogSearchPage>;
   getTrack: (id: string) => Promise<Track>;
   getLyrics: (id: string) => Promise<Lyrics>;
   getPlaylist: (id: string) => Promise<PlaylistDetail>;
@@ -61,6 +63,16 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
       (payload) => RawSearchResponseSchema.parse(payload),
     );
     return mapSearchResponse(raw, page, pageSize);
+  }
+
+  async searchCatalog(keyword: string, type: 'album' | 'artist' | 'playlist', page: number, pageSize: number): Promise<CatalogSearchPage> {
+    const upstreamType = { album: 10, artist: 100, playlist: 1000 }[type];
+    const raw = await this.client.get(
+      neteaseEndpoints.search,
+      { keywords: keyword, type: upstreamType, limit: pageSize, offset: (page - 1) * pageSize },
+      (payload) => RawSearchResponseSchema.parse(payload),
+    );
+    return mapCatalogSearchResponse(raw, type, page, pageSize);
   }
 
   async getTrack(id: string): Promise<Track> {

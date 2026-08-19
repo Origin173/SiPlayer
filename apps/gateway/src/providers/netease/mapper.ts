@@ -2,8 +2,10 @@ import type {
   AlbumSummary,
   ArtistSummary,
   AudioQuality,
+  CatalogSearchPage,
   Lyrics,
   PlaylistDetail,
+  PlaylistSummary,
   StreamInfo,
   Track,
   TrackPage,
@@ -14,6 +16,7 @@ import type {
   RawLyricsResponse,
   RawPlaylist,
   RawPrivilege,
+  RawSearchPlaylist,
   RawSearchResponse,
   RawSong,
   RawStreamResponse,
@@ -28,7 +31,7 @@ export function safeUrl(value: string | null | undefined): string | null {
   }
 }
 
-function mapArtist(raw: RawArtist): ArtistSummary {
+export function mapArtist(raw: RawArtist): ArtistSummary {
   return {
     id: raw.id,
     name: raw.name?.trim() || '未知艺术家',
@@ -36,7 +39,7 @@ function mapArtist(raw: RawArtist): ArtistSummary {
   };
 }
 
-function mapAlbum(raw: RawAlbum | null | undefined): AlbumSummary | null {
+export function mapAlbum(raw: RawAlbum | null | undefined): AlbumSummary | null {
   if (!raw) return null;
   const artists = (raw.artists ?? []).map(mapArtist);
   return {
@@ -83,6 +86,45 @@ export function mapSearchResponse(raw: RawSearchResponse, page: number, pageSize
     page,
     pageSize,
     hasMore: raw.result?.more ?? page * pageSize < total,
+  };
+}
+
+function mapSearchPlaylist(raw: RawSearchPlaylist): PlaylistSummary {
+  return {
+    id: raw.id,
+    name: raw.name.trim() || '未命名歌单',
+    artworkUrl: safeUrl(raw.coverImgUrl ?? raw.picUrl),
+    creator: raw.creator
+      ? { id: raw.creator.userId, name: raw.creator.nickname || '未知用户', avatarUrl: safeUrl(raw.creator.avatarUrl) }
+      : null,
+    trackCount: raw.trackCount ?? null,
+    description: raw.description ?? null,
+  };
+}
+
+export function mapCatalogSearchResponse(
+  raw: RawSearchResponse,
+  type: 'album' | 'artist' | 'playlist',
+  page: number,
+  pageSize: number,
+): CatalogSearchPage {
+  const result = raw.result;
+  const items = type === 'album'
+    ? result?.albums.map((album) => mapAlbum(album)).filter((album): album is AlbumSummary => Boolean(album)) ?? []
+    : type === 'artist'
+      ? result?.artists.map(mapArtist) ?? []
+      : result?.playlists.map(mapSearchPlaylist) ?? [];
+  const total = type === 'album'
+    ? result?.albumCount ?? page * pageSize + items.length
+    : type === 'artist'
+      ? result?.artistCount ?? page * pageSize + items.length
+      : result?.playlistCount ?? page * pageSize + items.length;
+  return {
+    type,
+    items,
+    page,
+    pageSize,
+    hasMore: result?.more ?? page * pageSize < total,
   };
 }
 
