@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ResponseCache } from './responseCache';
+import { ResponseCache } from './responseCache.js';
 
 describe('ResponseCache', () => {
   it('expires entries after the configured TTL', () => {

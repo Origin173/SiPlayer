@@ -15,6 +15,32 @@ ENABLE_PROXY=false ENABLE_GENERAL_UNBLOCK=false PORT=3000 node app.js
 
 The Gateway should reach this service only over a private network through `NETEASE_API_BASE_URL`. Do not expose port 3000 publicly.
 
+## Gateway production start
+
+From the repository root, install the workspace and compile the Gateway:
+
+```bash
+cd ~/gateway/SiPlayer
+pnpm install --frozen-lockfile
+pnpm --filter @siplayer/gateway build
+```
+
+Set the production environment variables before starting it. The minimum production configuration is:
+
+```bash
+export NODE_ENV=production
+export HOST=127.0.0.1
+export PORT=8787
+export NETEASE_API_BASE_URL=http://127.0.0.1:3000
+export SESSION_ENCRYPTION_KEY='replace-with-a-long-random-secret'
+export SESSION_STORE_PATH=/var/lib/siplayer/gateway-sessions.json
+export ALLOWED_ORIGINS=https://api.example.com
+export TRUST_PROXY=true
+pnpm --filter @siplayer/gateway start
+```
+
+Keep the Gateway behind Nginx/Caddy at the public HTTPS URL and proxy it to `127.0.0.1:8787`. The mobile app must use that public URL as `EXPO_PUBLIC_GATEWAY_URL`. The repository is a monorepo, but the Gateway build command above is intentionally run from the repository root; only EAS commands for the mobile app must run from `apps/mobile`.
+
 ## Deployment rules
 
 - Keep解灰/绕过访问控制能力 explicitly disabled in deployment configuration.

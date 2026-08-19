@@ -1,4 +1,4 @@
-import { RawArtistSchema } from './rawTypes';
+import { RawArtistSchema } from './rawTypes.js';
 import type {
   AlbumDetail,
   AlbumSummary,
@@ -27,7 +27,7 @@ import type {
   RawSearchResponse,
   RawSong,
   RawStreamResponse,
-} from './rawTypes';
+} from './rawTypes.js';
 
 export function safeUrl(value: string | null | undefined): string | null {
   if (!value) return null;

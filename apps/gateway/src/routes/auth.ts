@@ -21,8 +21,8 @@ import type {
 } from '@siplayer/contracts';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { NeteaseProviderError, type AuthProvider } from '../providers';
-import type { QrChallengeStore, SessionPrincipal, SessionStore } from '../auth/stores';
+import { NeteaseProviderError, type AuthProvider } from '../providers/index.js';
+import type { QrChallengeStore, SessionPrincipal, SessionStore } from '../auth/stores.js';
 
 const challengeParamsSchema = z.object({ challengeId: z.string().trim().min(1) });
 const trackParamsSchema = z.object({ id: z.string().trim().min(1) });

@@ -1,7 +1,7 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { defaultSessionStorePath, loadConfig } from './env';
+import { defaultSessionStorePath, loadConfig } from './env.js';
 
 describe('gateway config', () => {
   it('uses safe local defaults', () => {

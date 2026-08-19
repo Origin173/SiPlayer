@@ -2,9 +2,9 @@ import type { PlaylistSummary, Track, UserProfile } from '@siplayer/contracts';
 import type {
   RawLoginStatusResponse,
   RawRecentTracksResponse,
-} from './authRawTypes';
-import type { RawPlaylist } from './rawTypes';
-import { mapDetailTrack, safeUrl } from './mapper';
+} from './authRawTypes.js';
+import type { RawPlaylist } from './rawTypes.js';
+import { mapDetailTrack, safeUrl } from './mapper.js';
 
 export function mapUserProfile(raw: RawLoginStatusResponse): UserProfile | null {
   const profile = raw.profile;

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RawPlaylistSchema, RawSongSchema } from './rawTypes';
+import { RawPlaylistSchema, RawSongSchema } from './rawTypes.js';
 
 const NumericIdSchema = z.union([z.string(), z.number()]).transform(String);
 

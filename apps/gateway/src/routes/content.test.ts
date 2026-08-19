@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import type { AlbumDetail, ArtistAlbumPage, ArtistDetail, AudioQuality, CatalogSearchPage, Lyrics, PlaylistDetail, StreamInfo, Track, TrackPage } from '@siplayer/contracts';
-import { buildApp } from '../app';
-import { NeteaseProviderError, type ContentProvider } from '../providers';
-import { loadConfig } from '../config/env';
+import { buildApp } from '../app.js';
+import { NeteaseProviderError, type ContentProvider } from '../providers/index.js';
+import { loadConfig } from '../config/env.js';
 
 const track: Track = {
   id: 'track-1',

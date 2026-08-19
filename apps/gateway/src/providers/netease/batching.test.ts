@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chunkArray, orderByIds } from './batching';
+import { chunkArray, orderByIds } from './batching.js';
 
 describe('netease request batching', () => {
   it('splits large id lists into bounded batches', () => {

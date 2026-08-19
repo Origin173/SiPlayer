@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GatewayMetrics } from './metrics';
+import { GatewayMetrics } from './metrics.js';
 
 describe('GatewayMetrics', () => {
   it('aggregates request and upstream durations without retaining request data', () => {

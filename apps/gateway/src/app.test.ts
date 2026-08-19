@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { buildApp } from './app';
-import { loadConfig } from './config/env';
-import { GatewayMetrics } from './observability/metrics';
+import { buildApp } from './app.js';
+import { loadConfig } from './config/env.js';
+import { GatewayMetrics } from './observability/metrics.js';
 
 const app = buildApp(loadConfig({ NODE_ENV: 'test' }), { logger: false });
 

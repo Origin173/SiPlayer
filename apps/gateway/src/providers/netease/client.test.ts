@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NeteaseApiClient } from './client';
+import { NeteaseApiClient } from './client.js';
 
 function clientWithPayload(payload: unknown): NeteaseApiClient {
   return new NeteaseApiClient({

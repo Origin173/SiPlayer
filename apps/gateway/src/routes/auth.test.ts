@@ -10,9 +10,9 @@ import type {
   TrackPage,
   UserProfile,
 } from '@siplayer/contracts';
-import { buildApp } from '../app';
-import { loadConfig } from '../config/env';
-import type { AuthProvider, ContentProvider } from '../providers';
+import { buildApp } from '../app.js';
+import { loadConfig } from '../config/env.js';
+import type { AuthProvider, ContentProvider } from '../providers/index.js';
 
 const user: UserProfile = { id: 'user-1', nickname: 'Origin', avatarUrl: null };
 const track: Track = {

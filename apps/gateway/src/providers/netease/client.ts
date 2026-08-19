@@ -1,4 +1,4 @@
-import { NeteaseProviderError } from './errors';
+import { NeteaseProviderError } from './errors.js';
 
 export interface NeteaseApiClientOptions {
   baseUrl: string;

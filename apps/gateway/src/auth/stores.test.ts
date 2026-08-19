@@ -2,7 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { QrChallengeStore, SessionStore } from './stores';
+import { QrChallengeStore, SessionStore } from './stores.js';
 
 const user = { id: 'user-1', nickname: 'Origin', avatarUrl: null };
 

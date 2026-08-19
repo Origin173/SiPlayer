@@ -1,8 +1,8 @@
 import type { AlbumDetail, ArtistAlbumPage, ArtistDetail, AudioQuality, CatalogSearchPage, Lyrics, PlaylistCollections, PlaylistDetail, PlaylistSummary, StreamInfo, Track, TrackPage, UserProfile } from '@siplayer/contracts';
-import { NeteaseApiClient } from './client';
-import { neteaseEndpoints } from './endpoints';
-import { NeteaseProviderError } from './errors';
-import { chunkArray, orderByIds } from './batching';
+import { NeteaseApiClient } from './client.js';
+import { neteaseEndpoints } from './endpoints.js';
+import { NeteaseProviderError } from './errors.js';
+import { chunkArray, orderByIds } from './batching.js';
 import {
   RawLikeListResponseSchema,
   RawLoginStatusResponseSchema,
@@ -12,8 +12,8 @@ import {
   RawQrKeyResponseSchema,
   RawRecentTracksResponseSchema,
   RawUserPlaylistResponseSchema,
-} from './authRawTypes';
-import { mapPlaylistSummary, mapRecentTracks, mapUserProfile } from './authMapper';
+} from './authRawTypes.js';
+import { mapPlaylistSummary, mapRecentTracks, mapUserProfile } from './authMapper.js';
 import {
   mapCatalogSearchResponse,
   mapAlbumDetail,
@@ -24,7 +24,7 @@ import {
   mapPlaylist,
   mapSearchResponse,
   mapStream,
-} from './mapper';
+} from './mapper.js';
 import {
   type RawPrivilege,
   type RawSong,
@@ -37,7 +37,7 @@ import {
   RawSearchResponseSchema,
   RawStreamResponseSchema,
   RawTrackDetailResponseSchema,
-} from './rawTypes';
+} from './rawTypes.js';
 
 export interface ContentProvider {
   searchTracks: (keyword: string, page: number, pageSize: number) => Promise<TrackPage>;
@@ -316,10 +316,10 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
   }
 }
 
-export * from './authMapper';
-export * from './authRawTypes';
-export * from './client';
-export * from './endpoints';
-export * from './errors';
-export * from './mapper';
-export * from './rawTypes';
+export * from './authMapper.js';
+export * from './authRawTypes.js';
+export * from './client.js';
+export * from './endpoints.js';
+export * from './errors.js';
+export * from './mapper.js';
+export * from './rawTypes.js';

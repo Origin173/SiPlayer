@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import searchFixture from './fixtures/search.json';
-import lyricsFixture from './fixtures/lyrics.json';
-import streamFixture from './fixtures/stream.json';
-import { mapAlbumDetail, mapArtistAlbumPage, mapArtistDetail, mapCatalogSearchResponse, mapLyrics, mapSearchResponse, mapStream, parseLrc } from './mapper';
-import { RawAlbumDetailResponseSchema, RawArtistAlbumResponseSchema, RawArtistDetailResponseSchema, RawLyricsResponseSchema, RawSearchResponseSchema, RawStreamResponseSchema } from './rawTypes';
+import searchFixture from './fixtures/search.json' with { type: 'json' };
+import lyricsFixture from './fixtures/lyrics.json' with { type: 'json' };
+import streamFixture from './fixtures/stream.json' with { type: 'json' };
+import { mapAlbumDetail, mapArtistAlbumPage, mapArtistDetail, mapCatalogSearchResponse, mapLyrics, mapSearchResponse, mapStream, parseLrc } from './mapper.js';
+import { RawAlbumDetailResponseSchema, RawArtistAlbumResponseSchema, RawArtistDetailResponseSchema, RawLyricsResponseSchema, RawSearchResponseSchema, RawStreamResponseSchema } from './rawTypes.js';
 import type { AudioQuality } from '@siplayer/contracts';
 
 describe('netease mapper', () => {

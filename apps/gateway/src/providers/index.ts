@@ -1,1 +1,1 @@
-export * from './netease';
+export * from './netease/index.js';

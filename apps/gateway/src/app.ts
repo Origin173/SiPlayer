@@ -5,13 +5,13 @@ import {
   ReadyResponseSchema,
 } from '@siplayer/contracts';
 import { randomUUID } from 'node:crypto';
-import { loadConfig, type GatewayConfig } from './config/env';
-import { QrChallengeStore, SessionStore } from './auth/stores';
-import { NeteaseProvider, type AuthProvider, type ContentProvider } from './providers';
-import { registerAuthRoutes } from './routes/auth';
-import { registerContentRoutes } from './routes/content';
-import { GatewayMetrics } from './observability/metrics';
-import { ResponseCache, type CachedResponse } from './cache/responseCache';
+import { loadConfig, type GatewayConfig } from './config/env.js';
+import { QrChallengeStore, SessionStore } from './auth/stores.js';
+import { NeteaseProvider, type AuthProvider, type ContentProvider } from './providers/index.js';
+import { registerAuthRoutes } from './routes/auth.js';
+import { registerContentRoutes } from './routes/content.js';
+import { GatewayMetrics } from './observability/metrics.js';
+import { ResponseCache, type CachedResponse } from './cache/responseCache.js';
 
 export interface BuildAppOptions {
   logger?: FastifyServerOptions['logger'];

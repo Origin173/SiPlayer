@@ -14,7 +14,7 @@ import {
 } from '@siplayer/contracts';
 import { z } from 'zod';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { NeteaseProviderError, type ContentProvider } from '../providers';
+import { NeteaseProviderError, type ContentProvider } from '../providers/index.js';
 
 const searchQuerySchema = z.object({
   q: z.string().trim().min(1),
