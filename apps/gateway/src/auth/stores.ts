@@ -21,6 +21,8 @@ export interface QrChallenge {
   expiresAt: string;
 }
 
+type PersistenceErrorHandler = (error: unknown) => void;
+
 function encryptionKey(secret: string): Buffer {
   return createHash('sha256').update(secret).digest();
 }
@@ -57,11 +59,13 @@ export class SessionStore {
   private readonly key: Buffer;
   private readonly ttlMs: number;
   private readonly persistencePath?: string;
+  private readonly onPersistenceError?: PersistenceErrorHandler;
 
-  constructor(secret: string, ttlMs: number, persistencePath?: string) {
+  constructor(secret: string, ttlMs: number, persistencePath?: string, onPersistenceError?: PersistenceErrorHandler) {
     this.key = encryptionKey(secret);
     this.ttlMs = ttlMs;
     this.persistencePath = persistencePath;
+    this.onPersistenceError = onPersistenceError;
     this.load();
   }
 
@@ -81,8 +85,9 @@ export class SessionStore {
         });
       }
       this.pruneExpired(false);
-    } catch {
+    } catch (error) {
       // A missing or corrupt session file must not prevent the gateway from booting.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') this.onPersistenceError?.(error);
     }
   }
 
@@ -94,9 +99,14 @@ export class SessionStore {
       const entries = [...this.sessions.entries()].map(([tokenHash, session]) => ({ tokenHash, ...session }));
       writeFileSync(temporaryPath, JSON.stringify(entries), { encoding: 'utf8', mode: 0o600 });
       renameSync(temporaryPath, this.persistencePath);
-    } catch {
+    } catch (error) {
       // Session persistence is best effort; the in-memory store remains authoritative for this process.
-      rmSync(temporaryPath, { force: true });
+      try {
+        rmSync(temporaryPath, { force: true });
+      } catch {
+        // Preserve the original persistence error for observability.
+      }
+      this.onPersistenceError?.(error);
     }
   }
 

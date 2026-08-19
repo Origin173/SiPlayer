@@ -40,6 +40,7 @@ export function buildApp(
   options: BuildAppOptions = {},
 ): FastifyInstance {
   const app = Fastify({
+    trustProxy: config.TRUST_PROXY,
     logger:
       options.logger ?? {
         level: 'info',
@@ -137,10 +138,16 @@ export function buildApp(
   app.get('/ready', readyHandler);
 
   const provider = options.provider ?? new NeteaseProvider({ baseUrl: config.NETEASE_API_BASE_URL });
+  const sessions = new SessionStore(
+    config.SESSION_ENCRYPTION_KEY,
+    config.SESSION_TTL_MS,
+    config.SESSION_STORE_PATH,
+    (error) => app.log.warn({ err: error }, 'session persistence failed'),
+  );
   registerContentRoutes(app, { provider });
   registerAuthRoutes(app, {
     provider: options.authProvider ?? (provider as unknown as AuthProvider),
-    sessions: new SessionStore(config.SESSION_ENCRYPTION_KEY, config.SESSION_TTL_MS, config.SESSION_STORE_PATH),
+    sessions,
     challenges: new QrChallengeStore(),
   });
 

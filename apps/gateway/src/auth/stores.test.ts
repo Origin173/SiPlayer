@@ -38,11 +38,14 @@ describe('session stores', () => {
 
   it('keeps the in-memory session when persistence is temporarily unavailable', () => {
     const directory = mkdtempSync(join(tmpdir(), 'siplayer-session-'));
+    const errors: unknown[] = [];
     try {
-      const store = new SessionStore('a-test-secret-that-is-long-enough', 60_000, directory);
+      const store = new SessionStore('a-test-secret-that-is-long-enough', 60_000, directory, (error) => errors.push(error));
       const created = store.create(user, 'MUSIC_U=upstream-secret');
 
       expect(store.get(created.token)).toMatchObject({ user, cookie: 'MUSIC_U=upstream-secret' });
+      expect(errors.length).toBeGreaterThan(0);
+      expect(JSON.stringify(errors)).not.toContain('upstream-secret');
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

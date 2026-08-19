@@ -8,6 +8,7 @@ describe('gateway config', () => {
     expect(config.PORT).toBe(8787);
     expect(config.HOST).toBe('127.0.0.1');
     expect(config.NETEASE_API_BASE_URL).toBe('http://127.0.0.1:3000');
+    expect(config.TRUST_PROXY).toBe(false);
   });
 
   it('rejects an invalid upstream URL', () => {
@@ -22,5 +23,10 @@ describe('gateway config', () => {
       ALLOWED_ORIGINS: 'https://player.example.com',
       SESSION_STORE_PATH: '/var/lib/siplayer/sessions.json',
     }).ALLOWED_ORIGINS).toBe('https://player.example.com');
+  });
+
+  it('requires an explicit boolean value for trusted proxy mode', () => {
+    expect(loadConfig({ TRUST_PROXY: 'true' }).TRUST_PROXY).toBe(true);
+    expect(() => loadConfig({ TRUST_PROXY: 'yes' })).toThrow();
   });
 });
