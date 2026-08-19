@@ -11,6 +11,7 @@ import { NeteaseProvider, type AuthProvider, type ContentProvider } from './prov
 import { registerAuthRoutes } from './routes/auth';
 import { registerContentRoutes } from './routes/content';
 import { GatewayMetrics } from './observability/metrics';
+import { ResponseCache, type CachedResponse } from './cache/responseCache';
 
 export interface BuildAppOptions {
   logger?: FastifyServerOptions['logger'];
@@ -18,10 +19,29 @@ export interface BuildAppOptions {
   authProvider?: AuthProvider;
   readinessProbe?: () => Promise<boolean>;
   metrics?: GatewayMetrics;
+  responseCache?: ResponseCache;
 }
 
 function requestId(value: string | number): string {
   return String(value);
+}
+
+const cacheablePathPatterns = [
+  /^\/v1\/search$/,
+  /^\/v1\/tracks\/[^/]+$/,
+  /^\/v1\/tracks\/[^/]+\/lyrics$/,
+  /^\/v1\/albums\/[^/]+$/,
+  /^\/v1\/artists\/[^/]+$/,
+  /^\/v1\/artists\/[^/]+\/top-tracks$/,
+  /^\/v1\/artists\/[^/]+\/albums$/,
+  /^\/v1\/playlists\/[^/]+$/,
+];
+
+function responseCacheKey(request: FastifyRequest): string | undefined {
+  if (request.method !== 'GET') return undefined;
+  const path = request.url.split('?')[0] ?? request.url;
+  if (!cacheablePathPatterns.some((pattern) => pattern.test(path))) return undefined;
+  return `${request.method}:${request.url}`;
 }
 
 async function probeUpstream(baseUrl: string, timeoutMs = 2_000): Promise<boolean> {
@@ -60,7 +80,9 @@ export function buildApp(
     genReqId: () => `req_${randomUUID()}`,
   });
   const metrics = options.metrics ?? new GatewayMetrics();
+  const responseCache = options.responseCache ?? new ResponseCache(config.RESPONSE_CACHE_TTL_MS, config.RESPONSE_CACHE_MAX_ENTRIES);
   const requestStartTimes = new WeakMap<FastifyRequest, number>();
+  const cacheHits = new WeakSet<FastifyRequest>();
 
   app.addHook('onRequest', async (request) => {
     requestStartTimes.set(request, Date.now());
@@ -136,6 +158,30 @@ export function buildApp(
       };
       return reply.status(429).send(response);
     }
+  });
+
+  app.addHook('onRequest', async (request, reply) => {
+    const key = responseCacheKey(request);
+    if (!key) return;
+    const cached = responseCache.get(key);
+    if (!cached) return;
+    cacheHits.add(request);
+    if (cached.contentType) reply.header('content-type', cached.contentType);
+    return reply.status(cached.statusCode).send(cached.payload);
+  });
+
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (cacheHits.has(request) || reply.statusCode !== 200 || typeof payload !== 'string') return payload;
+    const key = responseCacheKey(request);
+    if (!key) return payload;
+    const contentType = reply.getHeader('content-type');
+    const cached: CachedResponse = {
+      payload,
+      statusCode: reply.statusCode,
+      ...(typeof contentType === 'string' ? { contentType } : {}),
+    };
+    responseCache.set(key, cached);
+    return payload;
   });
 
   const healthHandler = async (request: { id: string | number }) => {

@@ -29,4 +29,10 @@ describe('gateway config', () => {
     expect(loadConfig({ TRUST_PROXY: 'true' }).TRUST_PROXY).toBe(true);
     expect(() => loadConfig({ TRUST_PROXY: 'yes' })).toThrow();
   });
+
+  it('allows disabling the response cache', () => {
+    const config = loadConfig({ NODE_ENV: 'test', RESPONSE_CACHE_TTL_MS: '0', RESPONSE_CACHE_MAX_ENTRIES: '0' });
+    expect(config.RESPONSE_CACHE_TTL_MS).toBe(0);
+    expect(config.RESPONSE_CACHE_MAX_ENTRIES).toBe(0);
+  });
 });

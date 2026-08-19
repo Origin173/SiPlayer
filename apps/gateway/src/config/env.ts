@@ -13,6 +13,8 @@ const envSchema = z.object({
   TRUST_PROXY: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(120),
+  RESPONSE_CACHE_TTL_MS: z.coerce.number().int().nonnegative().default(30_000),
+  RESPONSE_CACHE_MAX_ENTRIES: z.coerce.number().int().nonnegative().default(256),
 });
 
 export type GatewayConfig = z.infer<typeof envSchema>;
