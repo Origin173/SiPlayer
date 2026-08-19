@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { UserProfile } from '@siplayer/contracts';
 
@@ -88,12 +88,15 @@ export class SessionStore {
 
   private persist(): void {
     if (!this.persistencePath) return;
+    const temporaryPath = `${this.persistencePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
       mkdirSync(dirname(this.persistencePath), { recursive: true });
       const entries = [...this.sessions.entries()].map(([tokenHash, session]) => ({ tokenHash, ...session }));
-      writeFileSync(this.persistencePath, JSON.stringify(entries), { encoding: 'utf8', mode: 0o600 });
+      writeFileSync(temporaryPath, JSON.stringify(entries), { encoding: 'utf8', mode: 0o600 });
+      renameSync(temporaryPath, this.persistencePath);
     } catch {
       // Session persistence is best effort; the in-memory store remains authoritative for this process.
+      rmSync(temporaryPath, { force: true });
     }
   }
 

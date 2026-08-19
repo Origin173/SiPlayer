@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -30,6 +30,19 @@ describe('session stores', () => {
 
       expect(persisted).not.toContain('upstream-secret');
       expect(second.get(created.token)).toMatchObject({ user, cookie: 'MUSIC_U=upstream-secret' });
+      expect(readdirSync(directory).filter((name) => name.endsWith('.tmp'))).toEqual([]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the in-memory session when persistence is temporarily unavailable', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'siplayer-session-'));
+    try {
+      const store = new SessionStore('a-test-secret-that-is-long-enough', 60_000, directory);
+      const created = store.create(user, 'MUSIC_U=upstream-secret');
+
+      expect(store.get(created.token)).toMatchObject({ user, cookie: 'MUSIC_U=upstream-secret' });
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
