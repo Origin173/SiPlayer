@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app';
 import { loadConfig } from './config/env';
 
@@ -58,6 +58,21 @@ describe('gateway foundation routes', () => {
     expect(response.statusCode).toBe(503);
     expect(body.data.status).toBe('ready');
     expect(body.data.upstream).toBe('unavailable');
+  });
+
+  it('does not treat an upstream HTTP error as ready', async () => {
+    const fetchBefore = globalThis.fetch;
+    vi.stubGlobal('fetch', async () => new Response(null, { status: 503 }));
+    const unavailableApp = buildApp(loadConfig({ NODE_ENV: 'test' }), { logger: false });
+
+    try {
+      const response = await unavailableApp.inject({ method: 'GET', url: '/v1/ready' });
+      expect(response.statusCode).toBe(503);
+      expect(response.json<{ data: { upstream: string } }>().data.upstream).toBe('unavailable');
+    } finally {
+      await unavailableApp.close();
+      vi.stubGlobal('fetch', fetchBefore);
+    }
   });
 
   it('rate limits non-health requests while keeping health available', async () => {

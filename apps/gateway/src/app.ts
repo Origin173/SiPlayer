@@ -26,8 +26,8 @@ async function probeUpstream(baseUrl: string, timeoutMs = 2_000): Promise<boolea
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    await fetch(`${baseUrl.replace(/\/$/, '')}/`, { signal: controller.signal });
-    return true;
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/`, { signal: controller.signal });
+    return response.ok;
   } catch {
     return false;
   } finally {

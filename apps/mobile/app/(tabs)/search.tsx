@@ -28,7 +28,7 @@ export default function SearchScreen() {
     searchType !== 'track',
   );
   const results = trackSearch.data?.pages.flatMap((page) => page.items) ?? [];
-  const catalogItems = catalogSearch.data?.items ?? [];
+  const catalogItems = catalogSearch.data?.pages.flatMap((page) => page.items) ?? [];
   const queueItems = results.map(queueItemFromTrack);
   const activeSearch = searchType === 'track' ? trackSearch : catalogSearch;
   const isDebouncing = submittedKeyword !== debouncedSubmittedKeyword;
@@ -90,7 +90,12 @@ export default function SearchScreen() {
           data={catalogItems}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={<Text style={[styles.historyText, { color: theme.colors.textSecondary }]}>没有找到匹配的结果</Text>}
-          ListHeaderComponent={<View style={styles.results}><SearchTypeSwitcher onChange={setSearchType} value={searchType} /><View style={styles.resultHeader}><Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>{searchType === 'album' ? '专辑' : searchType === 'artist' ? '歌手' : '歌单'}</Text><Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>{catalogItems.length} 个结果</Text></View></View>}
+          ListFooterComponent={catalogSearch.hasNextPage ? <Button disabled={catalogSearch.isFetchingNextPage} onPress={() => void catalogSearch.fetchNextPage()} variant="secondary">{catalogSearch.isFetchingNextPage ? '加载中…' : '加载更多'}</Button> : null}
+          ListHeaderComponent={<View style={styles.results}><SearchTypeSwitcher onChange={setSearchType} value={searchType} /><View style={styles.resultHeader}><Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>{searchType === 'album' ? '专辑' : searchType === 'artist' ? '歌手' : '歌单'}</Text>{catalogSearch.isFetching ? <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>更新中</Text> : <Text style={[styles.resultCount, { color: theme.colors.textSecondary }]}>{catalogItems.length} 个结果</Text>}</View></View>}
+          onEndReached={() => {
+            if (catalogSearch.hasNextPage && !catalogSearch.isFetchingNextPage) void catalogSearch.fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
           renderItem={({ item }) => <CatalogRow item={item} onPress={() => {
             if (searchType === 'playlist') router.push(`/playlist/${item.id}`);
             else if (searchType === 'album') router.push(`/album/${item.id}`);
