@@ -37,4 +37,17 @@ describe('playback resolver', () => {
     await expect(resolveStream('track-1', 'studio' as never)).rejects.toThrow();
     expect(request).not.toHaveBeenCalled();
   });
+
+  it('forwards cancellation to the API request', async () => {
+    request.mockResolvedValue({ data: stream, requestId: 'req_abortable' });
+    const controller = new AbortController();
+
+    await expect(resolveStream('track-1', 'high', controller.signal)).resolves.toEqual(stream);
+
+    expect(request).toHaveBeenCalledWith(
+      '/v1/tracks/track-1/stream?quality=high',
+      { signal: controller.signal },
+      expect.anything(),
+    );
+  });
 });

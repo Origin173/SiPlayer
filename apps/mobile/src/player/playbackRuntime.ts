@@ -4,6 +4,7 @@ import type { PlaybackState, QueueItem } from './playbackTypes';
 
 export interface PlaybackAudioEngine {
   replace: (source: { uri: string; name: string }) => void;
+  seekTo?: (positionMs: number) => void | Promise<void>;
   setActiveForLockScreen: (active: boolean, metadata: {
     title: string;
     artist: string;
@@ -17,10 +18,13 @@ export interface ResolveAndPlayOptions {
   item: QueueItem;
   quality: AudioQuality;
   isRetry: boolean;
-  resolve: (trackId: string, quality: AudioQuality) => Promise<StreamInfo>;
+  resolve: (trackId: string, quality: AudioQuality, signal?: AbortSignal) => Promise<StreamInfo>;
+  signal?: AbortSignal;
   isCurrent: () => boolean;
   audio: PlaybackAudioEngine;
   setPlaybackState: (state: PlaybackState) => void;
+  positionMs?: number;
+  autoPlay?: boolean;
   onStarted?: () => void;
 }
 
@@ -33,7 +37,7 @@ export async function resolveAndPlayTrack(options: ResolveAndPlayOptions): Promi
   options.setPlaybackState('resolving');
 
   try {
-    const stream = await options.resolve(options.item.trackId, options.quality);
+    const stream = await options.resolve(options.item.trackId, options.quality, options.signal);
     if (!options.isCurrent()) return { status: 'stale' };
 
     options.audio.replace({ uri: stream.url, name: options.item.title });
@@ -45,7 +49,14 @@ export async function resolveAndPlayTrack(options: ResolveAndPlayOptions): Promi
     });
     options.onStarted?.();
     options.setPlaybackState('loading');
-    options.audio.play();
+    if (options.positionMs && options.audio.seekTo) {
+      await options.audio.seekTo(options.positionMs);
+    }
+    if (options.autoPlay === false) {
+      options.setPlaybackState('paused');
+    } else {
+      options.audio.play();
+    }
     return { status: 'played' };
   } catch (error) {
     if (!options.isCurrent()) return { status: 'stale' };

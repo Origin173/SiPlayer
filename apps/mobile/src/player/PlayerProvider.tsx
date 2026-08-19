@@ -45,6 +45,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const clear = usePlayerStore((state) => state.clear);
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
+  const resolveAbortControllerRef = useRef<AbortController | null>(null);
   const resolvedTrackIdRef = useRef<string | null>(null);
   const streamRetryCountRef = useRef(0);
   const audioErrorRef = useRef(false);
@@ -60,6 +61,8 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     return () => {
       mountedRef.current = false;
       generationRef.current += 1;
+      resolveAbortControllerRef.current?.abort();
+      resolveAbortControllerRef.current = null;
       resolvedTrackIdRef.current = null;
     };
   }, []);
@@ -87,30 +90,40 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   }, [setPlaybackMode, setPlaybackQuality]);
 
   const resolveAndPlay = useCallback(
-    async (item: QueueItem, isRetry = false) => {
+    async (item: QueueItem, isRetry = false, transition: { positionMs?: number; autoPlay?: boolean } = {}) => {
       const generation = ++generationRef.current;
+      resolveAbortControllerRef.current?.abort();
+      const abortController = new AbortController();
+      resolveAbortControllerRef.current = abortController;
       if (!isRetry) streamRetryCountRef.current = 0;
       resolvedTrackIdRef.current = null;
 
-      const result = await resolveAndPlayTrack({
-        item,
-        quality: usePlayerStore.getState().quality,
-        isRetry,
-        resolve: resolveStream,
-        isCurrent: () => mountedRef.current && generation === generationRef.current,
-        audio: {
-          replace: (source) => audioPlayer.replace(source),
-          setActiveForLockScreen: (active, metadata) => audioPlayer.setActiveForLockScreen(active, metadata),
-          play: () => audioPlayer.play(),
-        },
-        setPlaybackState,
-        onStarted: () => {
-          resolvedTrackIdRef.current = item.trackId;
-          if (!isRetry && item.track) void recordLocalTrack(item.track);
-        },
-      });
+      try {
+        const result = await resolveAndPlayTrack({
+          item,
+          quality: usePlayerStore.getState().quality,
+          isRetry,
+          resolve: (trackId, quality, signal) => resolveStream(trackId, quality, signal),
+          signal: abortController.signal,
+          isCurrent: () => mountedRef.current && generation === generationRef.current,
+          audio: {
+            replace: (source) => audioPlayer.replace(source),
+            seekTo: (positionMs) => audioPlayer.seekTo(positionMs / 1000),
+            setActiveForLockScreen: (active, metadata) => audioPlayer.setActiveForLockScreen(active, metadata),
+            play: () => audioPlayer.play(),
+          },
+          setPlaybackState,
+          ...transition,
+          onStarted: () => {
+            resolvedTrackIdRef.current = item.trackId;
+            if (!isRetry && item.track) void recordLocalTrack(item.track);
+          },
+        });
 
-      if (result.status === 'failed') resolvedTrackIdRef.current = null;
+        if (result.status === 'failed') resolvedTrackIdRef.current = null;
+      } finally {
+        if (resolveAbortControllerRef.current === abortController) resolveAbortControllerRef.current = null;
+      }
     },
     [audioPlayer, setPlaybackState],
   );
@@ -119,10 +132,11 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     (index: number, items = usePlayerStore.getState().queue) => {
       const item = items[index];
       if (!item) return;
+      audioPlayer.pause();
       setCurrentIndex(index);
       void resolveAndPlay(item);
     },
-    [resolveAndPlay, setCurrentIndex],
+    [audioPlayer, resolveAndPlay, setCurrentIndex],
   );
 
   const playQueueIndex = useCallback((index: number) => {
@@ -146,6 +160,8 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     if (state.queue.length === 0) return;
     if (state.playbackState === 'resolving') {
       generationRef.current += 1;
+      resolveAbortControllerRef.current?.abort();
+      resolveAbortControllerRef.current = null;
       resolvedTrackIdRef.current = null;
     }
     audioPlayer.pause();
@@ -161,12 +177,13 @@ export function PlayerProvider({ children }: PropsWithChildren) {
 
   const setPlayerQueue = useCallback(
     (items: QueueItem[], startIndex = 0) => {
+      audioPlayer.pause();
       setQueue(items, startIndex);
       const safeIndex = items.length > 0 ? Math.min(Math.max(startIndex, 0), items.length - 1) : -1;
       const item = items[safeIndex];
       if (item) void resolveAndPlay(item);
     },
-    [resolveAndPlay, setQueue],
+    [audioPlayer, resolveAndPlay, setQueue],
   );
 
   const playTrack = useCallback(
@@ -240,6 +257,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
         return;
       }
       const nextIndex = Math.min(state.currentIndex > index ? state.currentIndex - 1 : state.currentIndex, nextQueue.length - 1);
+      if (index === state.currentIndex) audioPlayer.pause();
       setQueue(nextQueue, Math.max(nextIndex, 0));
       if (index === state.currentIndex) {
         const nextItem = nextQueue[Math.max(nextIndex, 0)];
@@ -263,6 +281,8 @@ export function PlayerProvider({ children }: PropsWithChildren) {
 
   const clearQueue = useCallback(() => {
     generationRef.current += 1;
+    resolveAbortControllerRef.current?.abort();
+    resolveAbortControllerRef.current = null;
     resolvedTrackIdRef.current = null;
     clear();
     audioPlayer.pause();
@@ -276,9 +296,13 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       void updateAppSettings({ quality });
       const state = usePlayerStore.getState();
       const item = state.queue[state.currentIndex];
-      if (item) void resolveAndPlay(item);
+      if (item) {
+        const autoPlay = state.playbackState === 'playing' || state.playbackState === 'buffering' || state.playbackState === 'loading';
+        audioPlayer.pause();
+        void resolveAndPlay(item, false, { positionMs: state.positionMs, autoPlay });
+      }
     },
-    [resolveAndPlay, setPlaybackQuality],
+    [audioPlayer, resolveAndPlay, setPlaybackQuality],
   );
 
   const setMode = useCallback((mode: PlaybackMode) => {

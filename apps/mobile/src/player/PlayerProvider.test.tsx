@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
     didJustFinish: false,
     error: null as unknown,
   },
-  resolveStream: vi.fn<(trackId: string, quality: AudioQuality) => Promise<StreamInfo>>(),
+  resolveStream: vi.fn<(trackId: string, quality: AudioQuality, signal?: AbortSignal) => Promise<StreamInfo>>(),
   loadAppSettings: vi.fn(),
   updateAppSettings: vi.fn(),
   recordLocalTrack: vi.fn(),
@@ -124,6 +124,10 @@ function resetAudioStatus(): void {
   });
 }
 
+function expectStreamResolve(trackId: string, quality: AudioQuality): void {
+  expect(mocks.resolveStream).toHaveBeenCalledWith(trackId, quality, expect.any(AbortSignal));
+}
+
 beforeEach(() => {
   capturedController = null;
   usePlayerStore.getState().clear();
@@ -145,7 +149,7 @@ describe('PlayerProvider', () => {
       controller.playTrack(item);
     });
 
-    expect(mocks.resolveStream).toHaveBeenCalledWith(item.trackId, 'auto');
+    expectStreamResolve(item.trackId, 'auto');
     expect(mocks.audioPlayer.replace).toHaveBeenCalledWith({ uri: stream(item.trackId).url, name: item.title });
     expect(mocks.audioPlayer.setActiveForLockScreen).toHaveBeenCalledWith(true, {
       title: item.title,
@@ -174,8 +178,90 @@ describe('PlayerProvider', () => {
     });
 
     expect(usePlayerStore.getState().currentIndex).toBe(1);
-    expect(mocks.resolveStream).toHaveBeenCalledWith(secondItem.trackId, 'auto');
+    expectStreamResolve(secondItem.trackId, 'auto');
     expect(mocks.audioPlayer.play).toHaveBeenCalledTimes(1);
+    unmount(renderer);
+  });
+
+  it('pauses the current source before resolving a selected queue item', async () => {
+    let resolveSecond!: (value: StreamInfo) => void;
+    mocks.resolveStream
+      .mockResolvedValueOnce(stream(item.trackId))
+      .mockImplementationOnce(() => new Promise<StreamInfo>((resolve) => { resolveSecond = resolve; }));
+    const { renderer, controller } = await mountProvider();
+
+    await act(async () => {
+      controller.playTrack(item, { queue: [item, secondItem], startIndex: 0 });
+    });
+    mocks.audioPlayer.pause.mockClear();
+
+    act(() => controller.playQueueIndex(1));
+
+    expect(mocks.audioPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(usePlayerStore.getState()).toMatchObject({ currentIndex: 1, playbackState: 'resolving' });
+    resolveSecond(stream(secondItem.trackId));
+    await flushPromises();
+    unmount(renderer);
+  });
+
+  it('preserves position and resumes playback when changing quality', async () => {
+    mocks.resolveStream.mockImplementation(async (trackId, quality) => ({ ...stream(trackId), requestedQuality: quality }));
+    const { renderer, controller } = await mountProvider();
+
+    await act(async () => controller.playTrack(item));
+    usePlayerStore.setState({ positionMs: 157_000, durationMs: 180_000, playbackState: 'playing' });
+    mocks.audioPlayer.pause.mockClear();
+    mocks.audioPlayer.play.mockClear();
+    mocks.audioPlayer.seekTo.mockClear();
+
+    await act(async () => controller.setQuality('lossless'));
+
+    expect(mocks.audioPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(mocks.audioPlayer.seekTo).toHaveBeenCalledWith(157);
+    expect(mocks.audioPlayer.play).toHaveBeenCalledTimes(1);
+    unmount(renderer);
+  });
+
+  it('preserves the paused state when changing quality', async () => {
+    mocks.resolveStream.mockImplementation(async (trackId, quality) => ({ ...stream(trackId), requestedQuality: quality }));
+    const { renderer, controller } = await mountProvider();
+
+    await act(async () => controller.playTrack(item));
+    usePlayerStore.setState({ positionMs: 157_000, durationMs: 180_000, playbackState: 'paused' });
+    mocks.audioPlayer.pause.mockClear();
+    mocks.audioPlayer.play.mockClear();
+    mocks.audioPlayer.seekTo.mockClear();
+
+    await act(async () => controller.setQuality('lossless'));
+
+    expect(mocks.audioPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(mocks.audioPlayer.seekTo).toHaveBeenCalledWith(157);
+    expect(mocks.audioPlayer.play).not.toHaveBeenCalled();
+    expect(usePlayerStore.getState().playbackState).toBe('paused');
+    unmount(renderer);
+  });
+
+  it('aborts the previous stream resolve when selecting another track', async () => {
+    let resolveSecond!: (value: StreamInfo) => void;
+    let firstSignal: AbortSignal | undefined;
+    mocks.resolveStream
+      .mockImplementationOnce((_trackId, _quality, signal) => {
+        firstSignal = signal;
+        return new Promise<StreamInfo>(() => undefined);
+      })
+      .mockImplementationOnce((_trackId, _quality, signal) => {
+        expect(signal?.aborted).toBe(false);
+        return new Promise<StreamInfo>((resolve) => { resolveSecond = resolve; });
+      });
+    const { renderer, controller } = await mountProvider();
+
+    act(() => controller.playTrack(item));
+    act(() => controller.playTrack(secondItem));
+
+    expect(firstSignal?.aborted).toBe(true);
+    resolveSecond(stream(secondItem.trackId));
+    await flushPromises();
+    expect(mocks.audioPlayer.replace).toHaveBeenCalledWith({ uri: stream(secondItem.trackId).url, name: secondItem.title });
     unmount(renderer);
   });
 
@@ -287,7 +373,7 @@ describe('PlayerProvider', () => {
       renderer.update(providerTree());
     });
     expect(usePlayerStore.getState().currentIndex).toBe(1);
-    expect(mocks.resolveStream).toHaveBeenCalledWith(secondItem.trackId, 'auto');
+    expect(mocks.resolveStream).toHaveBeenNthCalledWith(2, secondItem.trackId, 'auto', expect.any(AbortSignal));
     const callsAfterFinish = mocks.resolveStream.mock.calls.length;
 
     await act(async () => {
