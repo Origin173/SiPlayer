@@ -193,4 +193,22 @@ describe('content routes', () => {
     expect(body.error).toEqual({ code: 'AUTH_EXPIRED', message: 'The upstream login session has expired.', retryable: false });
   });
 
+  it('maps a required upstream session to HTTP 401', async () => {
+    const requiredApp = buildApp(loadConfig({ NODE_ENV: 'test' }), {
+      logger: false,
+      provider: {
+        ...provider,
+        getTrack: async () => {
+          throw new NeteaseProviderError('AUTH_REQUIRED', 'Login is required.', false, 401);
+        },
+      },
+    });
+    const response = await requiredApp.inject({ method: 'GET', url: '/v1/tracks/track-1' });
+    const body = response.json<{ error: { code: string; retryable: boolean } }>();
+    await requiredApp.close();
+
+    expect(response.statusCode).toBe(401);
+    expect(body.error).toEqual({ code: 'AUTH_REQUIRED', message: 'Login is required.', retryable: false });
+  });
+
 });

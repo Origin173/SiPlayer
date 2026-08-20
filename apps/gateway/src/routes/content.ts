@@ -40,6 +40,7 @@ function errorStatus(code: ApiError['code']): number {
       return 404;
     case 'UPSTREAM_TIMEOUT':
       return 504;
+    case 'AUTH_REQUIRED':
     case 'AUTH_EXPIRED':
       return 401;
     case 'UPSTREAM_UNAVAILABLE':
