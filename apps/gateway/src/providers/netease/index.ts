@@ -64,7 +64,6 @@ export interface AuthProvider {
 
 export class NeteaseProvider implements ContentProvider, AuthProvider {
   private readonly client: NeteaseApiClient;
-  private static readonly maxPlaylistTracks = 500;
   private static readonly detailBatchSize = 100;
 
   constructor(options: ConstructorParameters<typeof NeteaseApiClient>[0]) {
@@ -152,7 +151,7 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
       { id },
       (payload) => RawPlaylistDetailResponseSchema.parse(payload),
     );
-    const expectedCount = Math.min(raw.playlist.trackCount ?? raw.playlist.trackIds.length, NeteaseProvider.maxPlaylistTracks);
+    const expectedCount = raw.playlist.trackCount ?? raw.playlist.trackIds.length;
     const expectedIds = raw.playlist.trackIds.slice(0, expectedCount).map((track) => track.id);
     const songsById = new Map(raw.playlist.tracks.map((song) => [song.id, song]));
     if (expectedIds.length > songsById.size) {
