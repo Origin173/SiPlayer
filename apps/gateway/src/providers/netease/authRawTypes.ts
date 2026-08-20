@@ -39,6 +39,7 @@ export type RawLoginStatusResponse = z.infer<typeof RawLoginStatusResponseSchema
 
 export const RawUserPlaylistResponseSchema = z.object({
   code: z.number().optional(),
+  more: z.boolean().optional(),
   playlist: z.array(RawPlaylistSchema).default([]),
 }).passthrough();
 export type RawUserPlaylistResponse = z.infer<typeof RawUserPlaylistResponseSchema>;

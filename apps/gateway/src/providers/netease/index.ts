@@ -27,6 +27,7 @@ import {
 } from './mapper.js';
 import {
   type RawPrivilege,
+  type RawPlaylist,
   type RawSong,
   RawLyricsResponseSchema,
   RawAlbumDetailResponseSchema,
@@ -253,15 +254,24 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
   }
 
   async getUserPlaylists(userId: string, cookie: string): Promise<PlaylistCollections> {
-    const raw = await this.client.get(
-      neteaseEndpoints.userPlaylist,
-      { uid: userId, limit: 100, offset: 0 },
-      (payload) => RawUserPlaylistResponseSchema.parse(payload),
-      cookie,
-    );
+    const pageSize = 100;
+    let offset = 0;
+    const allPlaylists: RawPlaylist[] = [];
+    while (true) {
+      const raw = await this.client.get(
+        neteaseEndpoints.userPlaylist,
+        { uid: userId, limit: pageSize, offset },
+        (payload) => RawUserPlaylistResponseSchema.parse(payload),
+        cookie,
+      );
+      allPlaylists.push(...raw.playlist);
+      const hasMore = raw.more ?? raw.playlist.length >= pageSize;
+      if (!hasMore || raw.playlist.length === 0) break;
+      offset += raw.playlist.length;
+    }
     const created: PlaylistSummary[] = [];
     const subscribed: PlaylistSummary[] = [];
-    for (const playlist of raw.playlist.map(mapPlaylistSummary)) {
+    for (const playlist of allPlaylists.map(mapPlaylistSummary)) {
       if (playlist.creator?.id === userId) created.push(playlist);
       else subscribed.push(playlist);
     }

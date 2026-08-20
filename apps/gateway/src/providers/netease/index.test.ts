@@ -59,4 +59,32 @@ describe('NeteaseProvider stream quality mapping', () => {
     expect(requestedUrls.filter((url) => url.pathname === '/playlist/track/all')).toHaveLength(8);
   });
 
+  it('loads all user playlists across upstream pages', async () => {
+    const requestedUrls: URL[] = [];
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      requestedUrls.push(url);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      const count = offset === 0 ? 100 : 50;
+      const more = offset === 0;
+      return new Response(JSON.stringify({
+        code: 200,
+        more,
+        playlist: Array.from({ length: count }, (_, index) => ({
+          id: String(offset + index + 1),
+          name: `Playlist ${offset + index + 1}`,
+          creator: { userId: 'user-1', nickname: 'Origin' },
+        })),
+      }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const provider = new NeteaseProvider({ baseUrl: 'https://upstream.example', fetchImpl });
+
+    const playlists = await provider.getUserPlaylists('user-1', 'cookie');
+
+    expect(playlists.created).toHaveLength(150);
+    expect(playlists.subscribed).toHaveLength(0);
+    expect(requestedUrls.filter((url) => url.pathname === '/user/playlist')).toHaveLength(2);
+    expect(requestedUrls.map((url) => url.searchParams.get('offset'))).toEqual(['0', '100']);
+  });
+
 });
