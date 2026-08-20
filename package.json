@@ -6,7 +6,7 @@
   "author": "Origin173",
   "packageManager": "pnpm@11.22.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev:gateway": "pnpm --filter @siplayer/gateway dev",
