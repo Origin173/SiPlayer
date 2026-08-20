@@ -86,6 +86,7 @@ describe('content routes', () => {
     expect(firstSearch.statusCode).toBe(200);
     expect(secondSearch.statusCode).toBe(200);
     expect(searchTracks).toHaveBeenCalledTimes(1);
+    expect(firstSearch.json<{ requestId: string }>().requestId).not.toBe(secondSearch.json<{ requestId: string }>().requestId);
     expect(firstStream.statusCode).toBe(200);
     expect(secondStream.statusCode).toBe(200);
     expect(resolveStream).toHaveBeenCalledTimes(2);
@@ -191,4 +192,5 @@ describe('content routes', () => {
     expect(response.statusCode).toBe(401);
     expect(body.error).toEqual({ code: 'AUTH_EXPIRED', message: 'The upstream login session has expired.', retryable: false });
   });
+
 });

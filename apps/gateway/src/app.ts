@@ -44,6 +44,24 @@ function responseCacheKey(request: FastifyRequest): string | undefined {
   return `${request.method}:${request.url}`;
 }
 
+function extractCachedData(payload: string): string | undefined {
+  try {
+    const envelope = JSON.parse(payload) as { data?: unknown; requestId?: unknown };
+    if (!Object.prototype.hasOwnProperty.call(envelope, 'data') || typeof envelope.requestId !== 'string') return undefined;
+    return JSON.stringify(envelope.data);
+  } catch {
+    return undefined;
+  }
+}
+
+function buildCachedEnvelope(payload: string, requestId: string): string {
+  try {
+    return JSON.stringify({ data: JSON.parse(payload) as unknown, requestId });
+  } catch {
+    return payload;
+  }
+}
+
 async function probeUpstream(baseUrl: string, timeoutMs = 2_000): Promise<boolean> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -167,16 +185,18 @@ export function buildApp(
     if (!cached) return;
     cacheHits.add(request);
     if (cached.contentType) reply.header('content-type', cached.contentType);
-    return reply.status(cached.statusCode).send(cached.payload);
+    return reply.status(cached.statusCode).send(buildCachedEnvelope(cached.payload, requestId(request.id)));
   });
 
   app.addHook('onSend', async (request, reply, payload) => {
     if (cacheHits.has(request) || reply.statusCode !== 200 || typeof payload !== 'string') return payload;
     const key = responseCacheKey(request);
     if (!key) return payload;
+    const cachedData = extractCachedData(payload);
+    if (cachedData === undefined) return payload;
     const contentType = reply.getHeader('content-type');
     const cached: CachedResponse = {
-      payload,
+      payload: cachedData,
       statusCode: reply.statusCode,
       ...(typeof contentType === 'string' ? { contentType } : {}),
     };
