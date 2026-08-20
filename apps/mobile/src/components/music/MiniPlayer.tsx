@@ -58,7 +58,6 @@ function PressableBody({ children, onPress }: { children: ReactNode; onPress: ()
 const styles = StyleSheet.create({
   container: { alignItems: 'center', borderRadius: 16, borderWidth: 1, flexDirection: 'row', minHeight: MINI_PLAYER_HEIGHT, overflow: 'hidden', paddingHorizontal: 8 },
   body: { alignItems: 'center', flex: 1, flexDirection: 'row', minHeight: 48 },
-  bodyPressable: { alignItems: 'center', flex: 1, flexDirection: 'row' },
   copy: { flex: 1, marginHorizontal: 10, minWidth: 0 },
   title: { fontSize: 14, fontWeight: '600' },
   artist: { fontSize: 12, marginTop: 2 },
