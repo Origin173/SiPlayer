@@ -45,13 +45,14 @@ export default function PlaylistDetailScreen() {
   const playlist = playlistQuery.data;
   if (!playlist) return <Screen><EmptyState title="歌单不存在" message="找不到这个歌单。" /></Screen>;
   const playableTracks = playlist.tracks.filter((track) => track.playable);
+  const queueItems = playableTracks.map(queueItemFromTrack);
   const shuffle = () => {
-    const shuffled = [...playableTracks].sort(() => Math.random() - 0.5);
+    const randomStart = Math.floor(Math.random() * queueItems.length);
+    player.setMode('sequential');
+    player.setQueue(queueItems, randomStart);
     player.setMode('shuffle');
-    player.setQueue(shuffled.map(queueItemFromTrack), 0);
   };
 
-  const queueItems = playableTracks.map(queueItemFromTrack);
   return (
     <Screen contentContainerStyle={styles.screenContent} scroll={false}>
       <FlashList
