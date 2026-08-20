@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const platform = vi.hoisted(() => ({ OS: 'native' as string }));
 const secureStore = {
   getItemAsync: vi.fn(),
   setItemAsync: vi.fn(),
@@ -7,11 +8,14 @@ const secureStore = {
 };
 
 vi.mock('expo-secure-store', () => secureStore);
+vi.mock('react-native', () => ({ Platform: platform }));
 
 describe('session storage contract', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    platform.OS = 'native';
     secureStore.getItemAsync.mockResolvedValue(null);
     secureStore.setItemAsync.mockResolvedValue(undefined);
     secureStore.deleteItemAsync.mockResolvedValue(undefined);
@@ -43,5 +47,22 @@ describe('session storage contract', () => {
     await expect(getSessionToken()).resolves.toBe('session-1');
     await expect(clearSessionToken()).rejects.toThrow('SecureStore unavailable');
     await expect(getSessionToken()).resolves.toBeNull();
+  });
+
+  it('uses sessionStorage for Web sessions instead of SecureStore', async () => {
+    platform.OS = 'web';
+    const storage = {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    };
+    vi.stubGlobal('sessionStorage', storage);
+    const { getSessionToken, setSessionToken } = await import('./session');
+
+    await setSessionToken('web-session');
+
+    expect(storage.setItem).toHaveBeenCalledWith('siplayer.sessionToken', 'web-session');
+    expect(secureStore.setItemAsync).not.toHaveBeenCalled();
+    await expect(getSessionToken()).resolves.toBe('web-session');
   });
 });
