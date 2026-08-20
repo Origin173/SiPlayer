@@ -61,16 +61,20 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     overridden: { quality: false, playbackMode: false },
   });
 
+  const invalidatePendingPlayback = useCallback(() => {
+    generationRef.current += 1;
+    resolveAbortControllerRef.current?.abort();
+    resolveAbortControllerRef.current = null;
+    resolvedTrackIdRef.current = null;
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      generationRef.current += 1;
-      resolveAbortControllerRef.current?.abort();
-      resolveAbortControllerRef.current = null;
-      resolvedTrackIdRef.current = null;
+      invalidatePendingPlayback();
     };
-  }, []);
+  }, [invalidatePendingPlayback]);
 
   useEffect(() => {
     void setAudioModeAsync({
@@ -170,14 +174,11 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     const state = usePlayerStore.getState();
     if (state.queue.length === 0) return;
     if (state.playbackState === 'resolving') {
-      generationRef.current += 1;
-      resolveAbortControllerRef.current?.abort();
-      resolveAbortControllerRef.current = null;
-      resolvedTrackIdRef.current = null;
+      invalidatePendingPlayback();
     }
     audioPlayer.pause();
     setPlaybackState('paused');
-  }, [audioPlayer, setPlaybackState]);
+  }, [audioPlayer, invalidatePendingPlayback, setPlaybackState]);
 
   const toggle = useCallback(() => {
     const state = usePlayerStore.getState();
@@ -188,13 +189,14 @@ export function PlayerProvider({ children }: PropsWithChildren) {
 
   const setPlayerQueue = useCallback(
     (items: QueueItem[], startIndex = 0) => {
+      invalidatePendingPlayback();
       audioPlayer.pause();
       replaceQueue(items, startIndex);
       const safeIndex = items.length > 0 ? Math.min(Math.max(startIndex, 0), items.length - 1) : -1;
       const item = items[safeIndex];
       if (item) void resolveAndPlay(item);
     },
-    [audioPlayer, replaceQueue, resolveAndPlay],
+    [audioPlayer, invalidatePendingPlayback, replaceQueue, resolveAndPlay],
   );
 
   const playTrack = useCallback(
@@ -270,10 +272,10 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       if (index < 0 || index >= state.queue.length) return;
       const nextQueue = state.queue.filter((_, itemIndex) => itemIndex !== index);
       if (nextQueue.length === 0) {
+        invalidatePendingPlayback();
         clear();
         audioPlayer.pause();
         audioPlayer.clearLockScreenControls();
-        resolvedTrackIdRef.current = null;
         return;
       }
       const nextIndex = Math.min(state.currentIndex > index ? state.currentIndex - 1 : state.currentIndex, nextQueue.length - 1);
@@ -284,7 +286,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
         if (nextItem) void resolveAndPlay(nextItem);
       }
     },
-    [audioPlayer, clear, mutateQueue, resolveAndPlay],
+    [audioPlayer, clear, invalidatePendingPlayback, mutateQueue, resolveAndPlay],
   );
 
   const clearNext = useCallback(() => {
@@ -295,14 +297,11 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   }, [mutateQueue]);
 
   const clearQueue = useCallback(() => {
-    generationRef.current += 1;
-    resolveAbortControllerRef.current?.abort();
-    resolveAbortControllerRef.current = null;
-    resolvedTrackIdRef.current = null;
+    invalidatePendingPlayback();
     clear();
     audioPlayer.pause();
     audioPlayer.clearLockScreenControls();
-  }, [audioPlayer, clear]);
+  }, [audioPlayer, clear, invalidatePendingPlayback]);
 
   const setQuality = useCallback(
     (quality: AudioQuality) => {

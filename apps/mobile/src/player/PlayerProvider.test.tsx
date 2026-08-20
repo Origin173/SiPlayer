@@ -198,6 +198,27 @@ describe('PlayerProvider', () => {
     unmount(renderer);
   });
 
+  it('does not play a stream that resolves after the last queue item is removed', async () => {
+    let resolvePending!: (value: StreamInfo) => void;
+    mocks.resolveStream.mockImplementationOnce(() => new Promise<StreamInfo>((resolve) => {
+      resolvePending = resolve;
+    }));
+    const { renderer, controller } = await mountProvider();
+
+    act(() => controller.playTrack(item));
+    expectStreamResolve(item.trackId, 'auto');
+
+    act(() => controller.removeFromQueue(0));
+    expect(usePlayerStore.getState()).toMatchObject({ queue: [], currentIndex: -1 });
+
+    resolvePending(stream(item.trackId));
+    await flushPromises();
+
+    expect(mocks.audioPlayer.replace).not.toHaveBeenCalled();
+    expect(mocks.audioPlayer.play).not.toHaveBeenCalled();
+    unmount(renderer);
+  });
+
   it('keeps shuffle playback unique within a round and previous follows playback history', async () => {
     mocks.resolveStream.mockImplementation(async (trackId) => stream(trackId));
     const { renderer, controller } = await mountProvider();
