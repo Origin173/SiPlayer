@@ -15,6 +15,7 @@ interface PlayerStore {
   shuffleOrder: number[];
   shuffleCursor: number;
   playHistory: number[];
+  playHistoryCursor: number;
   replaceQueue: (queue: QueueItem[], startIndex?: number) => void;
   mutateQueue: (queue: QueueItem[], currentIndex?: number) => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
@@ -32,6 +33,7 @@ const emptyShuffleState = (currentIndex: number): ShuffleState => ({
   order: [],
   cursor: -1,
   history: currentIndex >= 0 ? [currentIndex] : [],
+  historyCursor: currentIndex >= 0 ? 0 : -1,
 });
 
 export const usePlayerStore = create<PlayerStore>((set) => ({
@@ -45,6 +47,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
   shuffleOrder: [],
   shuffleCursor: -1,
   playHistory: [],
+  playHistoryCursor: -1,
   replaceQueue: (queue, startIndex = 0) =>
     set((state) => {
       const currentIndex = queue.length > 0 ? Math.min(Math.max(startIndex, 0), queue.length - 1) : -1;
@@ -60,6 +63,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
         shuffleOrder: shuffle.order,
         shuffleCursor: shuffle.cursor,
         playHistory: shuffle.history,
+        playHistoryCursor: shuffle.historyCursor,
       };
     }),
   mutateQueue: (queue, currentIndex) =>
@@ -74,6 +78,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
           shuffleOrder: [],
           shuffleCursor: -1,
           playHistory: [],
+          playHistoryCursor: -1,
         };
       }
       const nextIndex = currentIndex ?? state.currentIndex;
@@ -86,6 +91,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
         shuffleOrder: shuffle.order,
         shuffleCursor: shuffle.cursor,
         playHistory: shuffle.history,
+        playHistoryCursor: shuffle.historyCursor,
       };
     }),
   reorderQueue: (fromIndex, toIndex) =>
@@ -101,6 +107,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
         shuffleOrder: shuffle.order,
         shuffleCursor: shuffle.cursor,
         playHistory: shuffle.history,
+        playHistoryCursor: shuffle.historyCursor,
       };
     }),
   setPlaybackState: (playbackState) => set({ playbackState }),
@@ -114,6 +121,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
         shuffleOrder: shuffle.order,
         shuffleCursor: shuffle.cursor,
         playHistory: shuffle.history,
+        playHistoryCursor: shuffle.historyCursor,
       };
     }),
   setQuality: (quality) => set({ quality }),
@@ -131,6 +139,7 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
     shuffleOrder: shuffle.order,
     shuffleCursor: shuffle.cursor,
     playHistory: shuffle.history,
+    playHistoryCursor: shuffle.historyCursor,
   }),
   updateTrackMetadata: (trackId, patch) => set((state) => ({
     queue: state.queue.map((item) => item.trackId === trackId && item.track
@@ -147,5 +156,6 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
       shuffleOrder: [],
       shuffleCursor: -1,
       playHistory: [],
+      playHistoryCursor: -1,
     }),
 }));

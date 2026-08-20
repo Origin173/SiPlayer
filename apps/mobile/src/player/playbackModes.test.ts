@@ -47,4 +47,28 @@ describe('queue playback modes', () => {
 
     expect(previous.index).toBe(first.index);
   });
+
+  it('replays shuffle history after rewinding across a round boundary', () => {
+    let state = createShuffleState(4, 0, () => 0);
+    let current = 0;
+    const played = [current];
+
+    for (let index = 0; index < 4; index += 1) {
+      const next = nextShuffleIndex(state, current, 4, () => 0);
+      current = next.index!;
+      state = next.state;
+      played.push(current);
+    }
+
+    const firstPrevious = previousShuffleIndex(state, current);
+    current = firstPrevious.index;
+    state = firstPrevious.state;
+    const secondPrevious = previousShuffleIndex(state, current);
+    current = secondPrevious.index;
+    state = secondPrevious.state;
+
+    const next = nextShuffleIndex(state, current, 4, () => 0);
+
+    expect(next.index).toBe(played[3]);
+  });
 });

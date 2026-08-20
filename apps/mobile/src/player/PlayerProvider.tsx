@@ -154,6 +154,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       order: [],
       cursor: -1,
       history: index >= 0 ? [index] : [],
+      historyCursor: index >= 0 ? 0 : -1,
     });
     goToIndex(index);
   }, [goToIndex, setShuffleState]);
@@ -216,7 +217,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
     if (state.queue.length === 0) return;
     let nextIndex: number | null;
     if (state.playbackMode === 'shuffle') {
-      const nextShuffle = nextShuffleIndex({ order: state.shuffleOrder, cursor: state.shuffleCursor, history: state.playHistory }, state.currentIndex, state.queue.length);
+      const nextShuffle = nextShuffleIndex({ order: state.shuffleOrder, cursor: state.shuffleCursor, history: state.playHistory, historyCursor: state.playHistoryCursor }, state.currentIndex, state.queue.length);
       nextIndex = nextShuffle.index;
       if (nextIndex != null) setShuffleState(nextShuffle.state);
     } else {
@@ -240,7 +241,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       return;
     }
     if (state.playbackMode === 'shuffle') {
-      const previousShuffle = previousShuffleIndex({ order: state.shuffleOrder, cursor: state.shuffleCursor, history: state.playHistory }, state.currentIndex);
+      const previousShuffle = previousShuffleIndex({ order: state.shuffleOrder, cursor: state.shuffleCursor, history: state.playHistory, historyCursor: state.playHistoryCursor }, state.currentIndex);
       setShuffleState(previousShuffle.state);
       goToIndex(previousShuffle.index);
       return;
