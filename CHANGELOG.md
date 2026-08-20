@@ -4,6 +4,68 @@ SiPlayer release history. Entries are generated from Git tags and commit message
 
 <!-- release entries -->
 
+## 0.1.0-alpha.2
+
+`2026-08-20`
+
+### 🐛 Fixes
+
+- set EAS local workdir in a step ([b4690ca](https://github.com/Origin173/SiPlayer/commit/b4690ca57678e75f9e70b91d8611b8c9da106e6b))
+- avoid timers for pre-aborted requests ([3c18a76](https://github.com/Origin173/SiPlayer/commit/3c18a761ebc48aa970f9084bcaf6de3bf0b7eaf4))
+- preserve shuffle history across rounds ([cffdfea](https://github.com/Origin173/SiPlayer/commit/cffdfeaed9fd6d4c73d7563bee9aa0858e8a6363))
+- validate every workspace version ([0d3f8a7](https://github.com/Origin173/SiPlayer/commit/0d3f8a73bffad9fa0df5ee1a6159d88bacfd7ed8))
+- inject and validate public gateway URL ([32c7aee](https://github.com/Origin173/SiPlayer/commit/32c7aee025dcf25edd07bbae1b53044a9af8c807))
+- invalidate pending playback on queue clear ([ac044b9](https://github.com/Origin173/SiPlayer/commit/ac044b9225e784b6b3e59f4cecf5152ede04a064))
+- clear UI state when session cleanup fails ([0ec4f18](https://github.com/Origin173/SiPlayer/commit/0ec4f189caf5b39030cbbaa18522618b3098368f))
+- support Web session storage ([e6c4ec4](https://github.com/Origin173/SiPlayer/commit/e6c4ec4c6702c1356dfafde9b8112f3ab6ed15a9))
+- make QR authorization idempotent ([9880f48](https://github.com/Origin173/SiPlayer/commit/9880f48ef7222fdcc9ec3bc3dbe22f6f0bce7a94))
+- delegate playlist shuffle to player ([5b3fe26](https://github.com/Origin173/SiPlayer/commit/5b3fe266ed705faf736afc227d2e40a4b1e81e27))
+- advertise rate-limit retry windows ([c4c1814](https://github.com/Origin173/SiPlayer/commit/c4c1814627b869750b4afd023d3eb1a76531bc5e))
+- exclude CORS preflight from rate limits ([7608c21](https://github.com/Origin173/SiPlayer/commit/7608c21e88744534dc32b1a0b77530e8423cb125))
+- canonicalize response cache keys ([11c1b02](https://github.com/Origin173/SiPlayer/commit/11c1b02715bd99ed3566b8c156bfd10fd12819c9))
+- show real MiniPlayer progress ([6bbbf97](https://github.com/Origin173/SiPlayer/commit/6bbbf97d6c68c88cddde5ac645de2b4131e5f12a))
+- validate all workspace package versions ([bf413f9](https://github.com/Origin173/SiPlayer/commit/bf413f96df54cd889e3c67abf1268609e611363f))
+- pin Expo tooling and build images ([5863a55](https://github.com/Origin173/SiPlayer/commit/5863a557803176482f24801e172cb003f11d2596))
+- merge top-level detail privileges ([d2b56fa](https://github.com/Origin173/SiPlayer/commit/d2b56fa1b60cc11cfeb9f9e790f472b0e4e8af02))
+- prefer upstream stream quality metadata ([874635a](https://github.com/Origin173/SiPlayer/commit/874635a9e4b430531376d60f06fac77adcd01b67))
+- reserve space for player overlays ([05141b3](https://github.com/Origin173/SiPlayer/commit/05141b3394f7280612cf87e6c814b7e08f195a0d))
+- deduplicate paginated search results ([5c2676d](https://github.com/Origin173/SiPlayer/commit/5c2676dfd5e204f1e2be3efd931e3ab82d53ec9a))
+- record recent tracks after playback starts ([0d40ac3](https://github.com/Origin173/SiPlayer/commit/0d40ac3969775157834b4a521a814e173aac1f4a))
+- preserve position on stream retry ([91930c8](https://github.com/Origin173/SiPlayer/commit/91930c85fc1d5329bac8f4a50e96b3c2df142834))
+- synchronize liked metadata in queue ([02121d1](https://github.com/Origin173/SiPlayer/commit/02121d18412a3f088c0fca8516f38c6635c0d31f))
+- preserve shuffle order and history ([a862cb9](https://github.com/Origin173/SiPlayer/commit/a862cb9dfcda588962ff0653943c0192ae93df7b))
+- clamp seek positions to duration ([f09c37b](https://github.com/Origin173/SiPlayer/commit/f09c37b008be1e940cc8fd84bdc138cbae0aad66))
+- serialize search history writes ([f9f62b5](https://github.com/Origin173/SiPlayer/commit/f9f62b57374dd00c725124cf70983a1981a892ee))
+- serialize local history writes ([22ce67c](https://github.com/Origin173/SiPlayer/commit/22ce67c3cbd48bdb8043720e035bf2cbf9753b23))
+- bundle Gateway as a standalone artifact ([fd9bb15](https://github.com/Origin173/SiPlayer/commit/fd9bb1536e3cd15728138385ecfd5c25564d4379))
+- paginate user playlists ([2c7f494](https://github.com/Origin173/SiPlayer/commit/2c7f494cb2576768e06e24a08607bf88032351bd))
+- load playlists beyond 500 tracks ([def434f](https://github.com/Origin173/SiPlayer/commit/def434fcf84ad6b46e3f0d78e0fe5b7f4058d036))
+- require explicit production session storage ([adacb6b](https://github.com/Origin173/SiPlayer/commit/adacb6b2f7c657b201c8f97b72d6484a35bc45ff))
+- merge cloud and local recent tracks ([b0fef6e](https://github.com/Origin173/SiPlayer/commit/b0fef6e3fbc3e2f2034845b85ac82d683363de50))
+- map high quality to exhigh ([4a4e9f2](https://github.com/Origin173/SiPlayer/commit/4a4e9f221c04a3e4c7386d3304fc5877b9108e92))
+- return 401 when authentication is required ([9b99411](https://github.com/Origin173/SiPlayer/commit/9b9941167318a46df3219d9590923e8ef81e7aff))
+- reissue request ids on cache hits ([e67ee21](https://github.com/Origin173/SiPlayer/commit/e67ee21f51e30b624a32573edd7e55a9677e190e))
+- base playback availability on playback privilege ([5e644da](https://github.com/Origin173/SiPlayer/commit/5e644da1965c5774d40f653f4b07edb93a364b25))
+- make QR login terminal and retry transient errors ([de986fb](https://github.com/Origin173/SiPlayer/commit/de986fbc052fa52a2c8d0f2709bd314b93bbcf54))
+- republish existing release artifacts ([84e8be3](https://github.com/Origin173/SiPlayer/commit/84e8be34401368ce4422a0b737d423d512064708))
+
+### 📚 Documentation
+
+- document local native build workflow ([9bdad9a](https://github.com/Origin173/SiPlayer/commit/9bdad9acf1011df15cb8e5d6181eab94b9a74b1c))
+- add AGENTS.md ([19979b6](https://github.com/Origin173/SiPlayer/commit/19979b68f79492ac11d519f1769b0141d24add6e))
+- declare file session store single-instance ([4ca7dd1](https://github.com/Origin173/SiPlayer/commit/4ca7dd1e79d0c7634105d2a39f5a261d9c2bf33f))
+
+### ✅ Tests
+
+- mock safe area in search screen ([8d8d069](https://github.com/Origin173/SiPlayer/commit/8d8d06991a53e5817198fd0e3e6bda17e2522675))
+- verify web session storage contract ([174dfbe](https://github.com/Origin173/SiPlayer/commit/174dfbed54ba96512c2b5bd153e8e8cdf6f2c464))
+
+### 📦 Maintenance
+
+- migrate native builds to local EAS ([0835b85](https://github.com/Origin173/SiPlayer/commit/0835b85672b29d9a2005827bff52206a9f9bb387))
+- require supported Node.js version ([d0ea770](https://github.com/Origin173/SiPlayer/commit/d0ea7700cf5966f884ea24caaa66a6e78c9ad295))
+- remove unused MiniPlayer style ([d47df68](https://github.com/Origin173/SiPlayer/commit/d47df681fe7f62ab75af666fe3c029be22223a82))
+
 ## 0.1.0-alpha.1
 
 `2026-08-19`
