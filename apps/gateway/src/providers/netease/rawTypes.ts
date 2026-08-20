@@ -88,6 +88,7 @@ export const RawAlbumDetailResponseSchema = z.object({
   code: z.number().optional(),
   album: RawAlbumSchema,
   songs: z.array(RawSongSchema).default([]),
+  privileges: z.array(RawPrivilegeSchema).default([]),
 }).passthrough();
 export type RawAlbumDetailResponse = z.infer<typeof RawAlbumDetailResponseSchema>;
 
@@ -144,12 +145,14 @@ export type RawPlaylist = z.infer<typeof RawPlaylistSchema>;
 export const RawPlaylistDetailResponseSchema = z.object({
   code: z.number().optional(),
   playlist: RawPlaylistSchema,
+  privileges: z.array(RawPrivilegeSchema).default([]),
 }).passthrough();
 export type RawPlaylistDetailResponse = z.infer<typeof RawPlaylistDetailResponseSchema>;
 
 export const RawPlaylistTracksResponseSchema = z.object({
   code: z.number().optional(),
   songs: z.array(RawSongSchema).default([]),
+  privileges: z.array(RawPrivilegeSchema).default([]),
 }).passthrough();
 export type RawPlaylistTracksResponse = z.infer<typeof RawPlaylistTracksResponseSchema>;
 

@@ -43,11 +43,13 @@ describe('netease mapper', () => {
         { id: 2, name: 'Second', ar: [{ id: 7, name: 'Origin' }], al: { id: 9, name: 'Quiet Album' } },
         { id: 1, name: 'First', ar: [{ id: 7, name: 'Origin' }], al: { id: 9, name: 'Quiet Album' } },
       ],
+      privileges: [{ id: 2, pl: 0, dl: 128, st: 0 }],
     });
     const detail = mapAlbumDetail(raw);
 
     expect(detail).toMatchObject({ id: '9', description: 'A calm record' });
     expect(detail.tracks.map((track) => track.id)).toEqual(['2', '1']);
+    expect(detail.tracks[0]).toMatchObject({ playable: false, availability: { reason: 'PRIVILEGE_REQUIRED' } });
   });
 
   it('maps flexible artist detail and paged albums responses', () => {

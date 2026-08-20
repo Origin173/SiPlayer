@@ -2,7 +2,7 @@ import type { AlbumDetail, ArtistAlbumPage, ArtistDetail, AudioQuality, CatalogS
 import { NeteaseApiClient } from './client.js';
 import { neteaseEndpoints } from './endpoints.js';
 import { NeteaseProviderError } from './errors.js';
-import { chunkArray, orderByIds } from './batching.js';
+import { chunkArray } from './batching.js';
 import {
   RawLikeListResponseSchema,
   RawLoginStatusResponseSchema,
@@ -154,7 +154,11 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
     );
     const expectedCount = raw.playlist.trackCount ?? raw.playlist.trackIds.length;
     const expectedIds = raw.playlist.trackIds.slice(0, expectedCount).map((track) => track.id);
-    const songsById = new Map(raw.playlist.tracks.map((song) => [song.id, song]));
+    const privileges = new Map(raw.privileges.map((privilege) => [privilege.id, privilege]));
+    const songsById = new Map<string, { song: RawSong; privilege?: RawPrivilege }>();
+    for (const song of raw.playlist.tracks) {
+      songsById.set(song.id, { song, privilege: privileges.get(song.id) ?? song.privilege });
+    }
     if (expectedIds.length > songsById.size) {
       for (const [offset, batch] of chunkArray(expectedIds, NeteaseProvider.detailBatchSize).entries()) {
         const all = await this.client.get(
@@ -162,13 +166,24 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
           { id, limit: batch.length, offset: offset * NeteaseProvider.detailBatchSize },
           (payload) => RawPlaylistTracksResponseSchema.parse(payload),
         );
-        for (const song of all.songs) songsById.set(song.id, song);
+        const batchPrivileges = new Map(all.privileges.map((privilege) => [privilege.id, privilege]));
+        for (const song of all.songs) {
+          songsById.set(song.id, {
+            song,
+            privilege: batchPrivileges.get(song.id) ?? privileges.get(song.id) ?? song.privilege,
+          });
+        }
       }
     }
     const songs = expectedIds.length > 0
-      ? orderByIds(expectedIds, [...songsById.values()])
-      : expectedCount > 0 ? raw.playlist.tracks.slice(0, expectedCount) : raw.playlist.tracks;
-    const tracks = songs.map((song) => mapDetailTrack(song, song.privilege));
+      ? expectedIds.flatMap((expectedId) => {
+        const item = songsById.get(expectedId);
+        return item ? [item] : [];
+      })
+      : expectedCount > 0
+        ? raw.playlist.tracks.slice(0, expectedCount).map((song) => ({ song, privilege: privileges.get(song.id) ?? song.privilege }))
+        : [...songsById.values()];
+    const tracks = songs.map(({ song, privilege }) => mapDetailTrack(song, privilege));
     return mapPlaylist(raw.playlist, tracks);
   }
 

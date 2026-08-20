@@ -61,10 +61,11 @@ export function mapAlbum(raw: RawAlbum | null | undefined): AlbumSummary | null 
 export function mapAlbumDetail(raw: RawAlbumDetailResponse): AlbumDetail {
   const album = mapAlbum(raw.album);
   if (!album) throw new Error('Album detail did not contain an album.');
+  const privileges = new Map(raw.privileges.map((privilege) => [privilege.id, privilege]));
   return {
     ...album,
     description: raw.album.description ?? null,
-    tracks: raw.songs.map((song) => mapDetailTrack(song, song.privilege)),
+    tracks: raw.songs.map((song) => mapDetailTrack(song, privileges.get(song.id) ?? song.privilege)),
   };
 }
 

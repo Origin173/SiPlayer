@@ -59,6 +59,25 @@ describe('NeteaseProvider stream quality mapping', () => {
     expect(requestedUrls.filter((url) => url.pathname === '/playlist/track/all')).toHaveLength(8);
   });
 
+  it('applies playlist-level privileges when songs omit their own privilege', async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
+      code: 200,
+      playlist: {
+        id: 'playlist-1',
+        name: 'Restricted playlist',
+        trackCount: 1,
+        trackIds: [{ id: '1' }],
+        tracks: [{ id: '1', name: 'Restricted track' }],
+      },
+      privileges: [{ id: '1', pl: 0, dl: 128, st: 0 }],
+    }), { status: 200 })) as unknown as typeof fetch;
+    const provider = new NeteaseProvider({ baseUrl: 'https://upstream.example', fetchImpl });
+
+    const playlist = await provider.getPlaylist('playlist-1');
+
+    expect(playlist.tracks[0]).toMatchObject({ playable: false, availability: { reason: 'PRIVILEGE_REQUIRED' } });
+  });
+
   it('loads all user playlists across upstream pages', async () => {
     const requestedUrls: URL[] = [];
     const fetchImpl = vi.fn(async (input: string | URL | Request) => {
