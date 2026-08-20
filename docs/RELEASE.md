@@ -38,12 +38,14 @@ git push origin v0.1.0
 
 ## 原生 APK / IPA 构建
 
-由于当前还没有 Apple Developer 签名凭据，工作流暂时只使用 EAS Build 云构建 Android 原生包。iOS 构建矩阵已注释，获得 Apple Developer 凭据后再恢复。
+Android 原生包由 GitHub Actions 的 `ubuntu-24.04` runner 执行 EAS local build。EAS 仍用于项目认证、remote credentials 和 remote app version，但不再使用 EAS 云端编译资源。iOS local build 的矩阵配置已准备好但保持注释，获得 Apple Developer 签名凭据后再启用。
 
 - Android：`siplayer-vX.Y.Z-android.apk`，明确使用 APK 格式，可下载到 Android 设备直接安装。
 - iOS：暂时不构建。没有 Apple Developer 账户时，不能生成可安装到真实 iPhone 或提交 TestFlight/App Store 的正式 IPA。
 
-首次启用前需要完成 EAS 项目初始化和原生签名凭据配置。下面的本地构建命令只建议每个平台首次运行一次，用于验证配置并让 EAS 按提示创建或保存凭据；之后不需要每次发布都运行。配置完成后，GitHub Actions 会自动执行同样的云构建。
+iOS 的 local build 配置已写入 workflow，但 matrix entry 默认注释。获得 Apple Developer Program 资格、配置 `com.origin173.siplayer` 的 EAS remote iOS credentials，并初始化 remote `ios.buildNumber` 后，只需取消 iOS matrix 项目的注释；workflow 会在 `macos-26`、Xcode 26.6 runner 上执行 `eas build --local`。本次不启用 iOS，也不执行 TestFlight/App Store 提交。
+
+首次启用前需要完成 EAS 项目初始化和原生签名凭据配置。下面的本地命令只建议每个平台首次运行一次，用于验证配置和检查 EAS remote credentials；之后不需要每次发布都运行。配置完成后，GitHub Actions 会在 runner 上执行同样的 local build。
 
 SiPlayer 是 pnpm monorepo，Expo App 根目录是 `apps/mobile`。EAS 命令必须从该目录执行，`apps/mobile/eas.json` 也必须保留在该目录；不要从仓库根目录执行 EAS 命令。
 
@@ -54,14 +56,29 @@ $repoRoot = "D:\Code\SiPlayer"
 Set-Location "$repoRoot\apps\mobile"
 $env:EXPO_PROJECT_ID = "<Expo/EAS project UUID>"
 $env:EXPO_PUBLIC_GATEWAY_URL = "https://你的-gateway-域名.example.com"
-pnpm dlx eas-cli@latest login
-pnpm dlx eas-cli@latest init
-pnpm dlx eas-cli@latest build --platform android --profile release
+pnpm dlx eas-cli@21.7.1 login
+pnpm dlx eas-cli@21.7.1 credentials --platform android
+pnpm dlx eas-cli@21.7.1 build --platform android --profile release --local
 # iOS requires Apple Developer credentials and is currently disabled.
-# pnpm dlx eas-cli@latest build --platform ios --profile release
+# pnpm dlx eas-cli@21.7.1 credentials --platform ios
+# pnpm dlx eas-cli@21.7.1 build --platform ios --profile release --local
 ```
 
-如果 Expo 控制台已经显示 Android 有成功的 EAS 构建，或者 Android 凭据已经配置完成，可以跳过本地构建。当前发布工作流只构建 Android，因此暂时不需要 iOS 签名凭据。
+如果 Android remote credentials 已经配置完成，可以跳过本地凭据检查。当前发布工作流只构建 Android，因此暂时不需要 iOS 签名凭据。
+
+### Local build 工具链
+
+Android local build 使用固定的 GitHub-hosted runner 和工具版本：
+
+- Runner：`ubuntu-24.04`
+- Node.js：`22.13.0`
+- pnpm：`11.22.0`
+- JDK：`17`
+- Android Platform：`android-36`
+- Android Build Tools：`36.0.0`
+- Android NDK：`27.1.12297006`（NDK r27b）
+
+`apps/mobile/eas.json` 保留 `appVersionSource: remote`、`autoIncrement: true` 和 `credentialsSource: remote`。因此 Android keystore 和 `versionCode` 仍由 EAS remote 管理，实际编译、签名和 APK 输出由 GitHub runner 完成。
 
 ### GitHub Actions 配置项
 
@@ -69,7 +86,7 @@ pnpm dlx eas-cli@latest build --platform android --profile release
 
 | 类型 | 名称 | 值 | 用途 |
 | --- | --- | --- | --- |
-| Secret | `EXPO_TOKEN` | Expo Personal Access Token | 让 GitHub Actions 登录 EAS 并发起云构建 |
+| Secret | `EXPO_TOKEN` | Expo Personal Access Token | 让 GitHub Actions 登录 EAS、读取 remote credentials 和 remote app version |
 | Variable | `EXPO_PROJECT_ID` | EAS 项目的 UUID | 指定 `siplayer` 对应的 Expo/EAS 项目 |
 | Variable | `EXPO_PUBLIC_GATEWAY_URL` | 正式 Gateway 的 HTTPS 地址，例如 `https://api.example.com` | 编译时写入 App 的后端 API 地址 |
 
@@ -101,7 +118,7 @@ Value: https://你的-gateway-域名.example.com
 #### 当前不需要添加的配置
 
 - `GITHUB_TOKEN`：GitHub Actions 自动提供，工作流用于创建 Release 和回写 changelog，不需要手动创建。
-- Android keystore：由 EAS Credentials 托管，不要复制到 GitHub Secret。首次本地 EAS 构建时按提示完成凭据配置。
+- Android keystore：由 EAS Credentials 托管，不要复制到 GitHub Secret。GitHub Actions local build 会通过 `EXPO_TOKEN` 获取 remote credentials。
 - iOS distribution certificate、provisioning profile：当前 iOS job 已暂停，暂时不需要；恢复 iOS 构建前必须配置 Apple Developer 凭据。
 - `APPLE_ID`、`ASC_API_KEY_ID`、`ASC_ISSUER_ID`、`ASC_API_KEY`：当前 iOS job 已暂停，且工作流不执行 TestFlight/App Store 提交，因此暂时不需要。以后恢复 iOS 或增加 `eas submit` 时再单独配置。
 - `NETEASE_API_BASE_URL`、`SESSION_ENCRYPTION_KEY`、`SESSION_STORE_PATH`：这些是 Gateway 服务器环境变量，不应写进 App 构建配置，也不应暴露给移动端。
@@ -128,7 +145,7 @@ git push origin v0.1.0-alpha.2
 
 这个手动入口会从原 workflow run 下载 `release-package-*`、`release-notes-*` 和 `native-android-*` artifacts，重新上传到同一个 GitHub Release，并更新 changelog。Artifacts 默认只保留 14 天；如果已经过期，就必须重新运行完整构建。
 
-EAS 负责保存 Android keystore；不要把证书、私钥或 token 提交到仓库。GitHub Actions 只通过 `EXPO_TOKEN` 触发 Android 云构建。
+EAS 继续负责保存 Android keystore 和 remote app version；不要把证书、私钥或 token 提交到仓库。GitHub Actions 使用 `EXPO_TOKEN` 获取 remote credentials，然后在 Ubuntu runner 本地完成 Android 编译和签名。
 
 注意：Android APK 可以直接下载安装（设备可能需要允许安装未知来源应用）。普通 iOS 用户不能仅凭下载的 IPA 直接安装；IPA 必须通过 TestFlight/App Store，或使用 Ad Hoc/Enterprise 签名并满足 Apple 的设备注册/企业分发条件。这是 Apple 的分发限制，不是 CI 能绕过的限制。
 
