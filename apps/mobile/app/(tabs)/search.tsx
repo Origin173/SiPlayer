@@ -8,6 +8,7 @@ import { CatalogRow, SongRow } from '@/components/music';
 import { Button, ErrorState, Screen, SearchField, Skeleton } from '@/components/ui';
 import { loadSearchHistory, recordSearchKeyword } from '@/features/searchHistory';
 import { createSearchPlaySelection } from '@/features/searchPlayback';
+import { dedupeByTrackId } from '@/features/searchResults';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { usePlayer } from '@/player';
 import { useTheme } from '@/theme';
@@ -27,8 +28,8 @@ export default function SearchScreen() {
     searchType === 'track' ? 'album' : searchType,
     searchType !== 'track',
   );
-  const results = trackSearch.data?.pages.flatMap((page) => page.items) ?? [];
-  const catalogItems = catalogSearch.data?.pages.flatMap((page) => page.items) ?? [];
+  const results = dedupeByTrackId(trackSearch.data?.pages.flatMap((page) => page.items) ?? []);
+  const catalogItems = dedupeByTrackId(catalogSearch.data?.pages.flatMap((page) => page.items) ?? []);
   const activeSearch = searchType === 'track' ? trackSearch : catalogSearch;
   const playSearchTrack = (track: Track) => {
     const selection = createSearchPlaySelection(results, track.id);
