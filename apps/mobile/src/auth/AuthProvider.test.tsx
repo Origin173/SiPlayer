@@ -140,6 +140,30 @@ describe('AuthProvider', () => {
     unmount(renderer);
   });
 
+  it('keeps the authorized session when a stale QR poll rejects afterward', async () => {
+    const authorized: QrStatusData = { status: 'AUTHORIZED', sessionToken: 'new-session', user };
+    let rejectStale!: (reason?: unknown) => void;
+    const staleRequest = new Promise<never>((_, reject) => {
+      rejectStale = reject;
+    });
+    mocks.apiClient.request
+      .mockResolvedValueOnce({ data: authorized, requestId: 'authorized' })
+      .mockReturnValueOnce(staleRequest);
+    const { renderer, controller } = await mountProvider();
+
+    const authorizedPoll = controller.pollQr('challenge-1');
+    const stalePoll = controller.pollQr('challenge-1');
+    await act(async () => {
+      await expect(authorizedPoll).resolves.toEqual(authorized);
+    });
+    expect(capturedController?.isAuthenticated).toBe(true);
+
+    rejectStale(new Error('stale timeout'));
+    await expect(stalePoll).rejects.toThrow('stale timeout');
+    expect(capturedController).toMatchObject({ isAuthenticated: true, user });
+    unmount(renderer);
+  });
+
   it('logs out locally even if the server logout request fails', async () => {
     mocks.getSessionToken.mockResolvedValue('project-session');
     mocks.apiClient.request
