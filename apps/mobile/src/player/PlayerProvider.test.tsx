@@ -171,6 +171,9 @@ describe('PlayerProvider', () => {
     });
     expect(mocks.audioPlayer.play).toHaveBeenCalledTimes(1);
     expect(usePlayerStore.getState()).toMatchObject({ currentIndex: 0, playbackState: 'loading' });
+    expect(mocks.recordLocalTrack).not.toHaveBeenCalled();
+    mocks.audioStatus = { ...mocks.audioStatus, playing: true, isLoaded: true };
+    await act(async () => renderer.update(providerTree()));
     expect(mocks.recordLocalTrack).toHaveBeenCalledWith(track);
     unmount(renderer);
   });

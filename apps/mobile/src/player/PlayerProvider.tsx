@@ -51,6 +51,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const generationRef = useRef(0);
   const resolveAbortControllerRef = useRef<AbortController | null>(null);
   const resolvedTrackIdRef = useRef<string | null>(null);
+  const recordedTrackIdRef = useRef<string | null>(null);
   const streamRetryCountRef = useRef(0);
   const audioErrorRef = useRef(false);
   const didJustFinishRef = useRef(false);
@@ -100,6 +101,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       const abortController = new AbortController();
       resolveAbortControllerRef.current = abortController;
       if (!isRetry) streamRetryCountRef.current = 0;
+      if (!isRetry) recordedTrackIdRef.current = null;
       resolvedTrackIdRef.current = null;
 
       try {
@@ -120,7 +122,6 @@ export function PlayerProvider({ children }: PropsWithChildren) {
           ...transition,
           onStarted: () => {
             resolvedTrackIdRef.current = item.trackId;
-            if (!isRetry && item.track) void recordLocalTrack(item.track);
           },
         });
 
@@ -365,7 +366,13 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       return;
     }
     if (audioStatus.isBuffering) setPlaybackState('buffering');
-    else if (audioStatus.playing) setPlaybackState('playing');
+    else if (audioStatus.playing) {
+      setPlaybackState('playing');
+      if (current.track && recordedTrackIdRef.current !== current.trackId) {
+        recordedTrackIdRef.current = current.trackId;
+        void recordLocalTrack(current.track);
+      }
+    }
     else if (audioStatus.isLoaded && state.playbackState !== 'resolving') setPlaybackState('paused');
   }, [audioStatus, resolveAndPlay, setPlaybackState, setPosition]);
 
