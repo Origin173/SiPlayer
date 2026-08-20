@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import searchFixture from './fixtures/search.json' with { type: 'json' };
 import lyricsFixture from './fixtures/lyrics.json' with { type: 'json' };
 import streamFixture from './fixtures/stream.json' with { type: 'json' };
-import { mapAlbumDetail, mapArtistAlbumPage, mapArtistDetail, mapCatalogSearchResponse, mapLyrics, mapSearchResponse, mapStream, parseLrc } from './mapper.js';
-import { RawAlbumDetailResponseSchema, RawArtistAlbumResponseSchema, RawArtistDetailResponseSchema, RawLyricsResponseSchema, RawSearchResponseSchema, RawStreamResponseSchema } from './rawTypes.js';
+import { mapAlbumDetail, mapArtistAlbumPage, mapArtistDetail, mapCatalogSearchResponse, mapLyrics, mapSearchResponse, mapStream, mapTrack, parseLrc } from './mapper.js';
+import { RawAlbumDetailResponseSchema, RawArtistAlbumResponseSchema, RawArtistDetailResponseSchema, RawLyricsResponseSchema, RawPrivilegeSchema, RawSearchResponseSchema, RawSongSchema, RawStreamResponseSchema } from './rawTypes.js';
 import type { AudioQuality } from '@siplayer/contracts';
 
 describe('netease mapper', () => {
@@ -85,6 +85,52 @@ describe('netease mapper', () => {
       requestedQuality: 'auto',
       actualQuality: 'high',
       bitrate: 320000,
+    });
+  });
+
+  it('does not confuse download permission with playback permission', () => {
+    const song = RawSongSchema.parse({
+      id: 123,
+      name: 'Streamable',
+      ar: [{ id: 7, name: 'Origin' }],
+      al: { id: 9, name: 'Quiet Album' },
+    });
+
+    const track = mapTrack(song, RawPrivilegeSchema.parse({ pl: 128, dl: 0, st: 0 }));
+
+    expect(track).toMatchObject({ playable: true });
+    expect(track.availability).toBeUndefined();
+  });
+
+  it('marks tracks without playback permission as unavailable', () => {
+    const song = RawSongSchema.parse({
+      id: 123,
+      name: 'Restricted',
+      ar: [{ id: 7, name: 'Origin' }],
+      al: { id: 9, name: 'Quiet Album' },
+    });
+
+    const track = mapTrack(song, RawPrivilegeSchema.parse({ pl: 0, dl: 128, st: 0 }));
+
+    expect(track).toMatchObject({
+      playable: false,
+      availability: { reason: 'PRIVILEGE_REQUIRED' },
+    });
+  });
+
+  it('marks removed tracks with the removed reason', () => {
+    const song = RawSongSchema.parse({
+      id: 123,
+      name: 'Removed',
+      ar: [{ id: 7, name: 'Origin' }],
+      al: { id: 9, name: 'Quiet Album' },
+    });
+
+    const track = mapTrack(song, RawPrivilegeSchema.parse({ pl: 128, dl: 128, st: -200 }));
+
+    expect(track).toMatchObject({
+      playable: false,
+      availability: { reason: 'REMOVED' },
     });
   });
 });

@@ -114,8 +114,11 @@ export function mapArtistAlbumPage(raw: RawArtistAlbumResponse, page: number, pa
 
 function unavailableReason(privilege?: RawPrivilege): Track['availability'] {
   if (!privilege) return undefined;
-  if (privilege.pl === 0 || privilege.dl === 0 || privilege.st === -200) {
-    return { reason: 'PRIVILEGE_REQUIRED', message: '当前歌曲需要相应账号权限' };
+  if (privilege.st === -200) {
+    return { reason: 'REMOVED', message: '歌曲已下架' };
+  }
+  if (privilege.pl === 0) {
+    return { reason: 'PRIVILEGE_REQUIRED', message: '当前账号暂无播放权限' };
   }
   return undefined;
 }
