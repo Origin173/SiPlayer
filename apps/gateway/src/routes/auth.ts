@@ -33,6 +33,8 @@ interface AuthRouteOptions {
   challenges: QrChallengeStore;
 }
 
+const qrPolls = new Map<string, Promise<QrStatusData>>();
+
 function requestId(request: FastifyRequest): string {
   return String(request.id);
 }
@@ -114,21 +116,33 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
       return { data, requestId: requestId(request) };
     }
 
-    try {
+    const authorizedData = challenge.status === 'AUTHORIZED'
+      ? QrStatusDataSchema.parse({ status: 'AUTHORIZED', sessionToken: challenge.sessionToken, user: challenge.user })
+      : undefined;
+    if (authorizedData) return { data: authorizedData, requestId: requestId(request) };
+
+    const poll = qrPolls.get(challenge.id) ?? (async (): Promise<QrStatusData> => {
       const status = await options.provider.checkQr(challenge.upstreamKey);
       if (status.status === 'AUTHORIZED') {
-        if (!status.cookie) return sendError(reply, request, { code: 'UPSTREAM_UNAVAILABLE', message: 'Login completed without a session.', retryable: true });
+        if (!status.cookie) throw new NeteaseProviderError('UPSTREAM_UNAVAILABLE', 'Login completed without a session.', true);
         const user = UserProfileSchema.parse(await options.provider.getCurrentUser(status.cookie));
         const session = options.sessions.create(user, status.cookie);
-        options.challenges.delete(challenge.id);
-        const data: QrStatusData = QrStatusDataSchema.parse({ status: 'AUTHORIZED', sessionToken: session.token, user });
-        return { data, requestId: requestId(request) };
+        const authorized = options.challenges.authorize(challenge.id, session.token, user);
+        if (!authorized) throw new NeteaseProviderError('UPSTREAM_UNAVAILABLE', 'Login session could not be stored.', true);
+        return QrStatusDataSchema.parse({ status: 'AUTHORIZED', sessionToken: authorized.sessionToken, user: authorized.user });
       }
       if (status.status === 'EXPIRED') options.challenges.delete(challenge.id);
-      const data: QrStatusData = QrStatusDataSchema.parse({ status: status.status });
+      return QrStatusDataSchema.parse({ status: status.status });
+    })();
+    if (!qrPolls.has(challenge.id)) qrPolls.set(challenge.id, poll);
+
+    try {
+      const data = await poll;
       return { data, requestId: requestId(request) };
     } catch (error) {
       return sendError(reply, request, normalizeProviderError(error));
+    } finally {
+      if (qrPolls.get(challenge.id) === poll) qrPolls.delete(challenge.id);
     }
   });
 

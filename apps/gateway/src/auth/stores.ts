@@ -15,11 +15,23 @@ interface StoredSession {
   expiresAtMs: number;
 }
 
-export interface QrChallenge {
+interface PendingQrChallenge {
   id: string;
   upstreamKey: string;
   expiresAt: string;
+  status: 'PENDING';
 }
+
+interface AuthorizedQrChallenge {
+  id: string;
+  upstreamKey: string;
+  expiresAt: string;
+  status: 'AUTHORIZED';
+  sessionToken: string;
+  user: UserProfile;
+}
+
+export type QrChallenge = PendingQrChallenge | AuthorizedQrChallenge;
 
 type PersistenceErrorHandler = (error: unknown) => void;
 
@@ -195,7 +207,7 @@ export class QrChallengeStore {
   private readonly challenges = new Map<string, QrChallenge>();
 
   create(upstreamKey: string, expiresAt: string): QrChallenge {
-    const challenge = { id: `qr_challenge_${randomUUID()}`, upstreamKey, expiresAt };
+    const challenge: PendingQrChallenge = { id: `qr_challenge_${randomUUID()}`, upstreamKey, expiresAt, status: 'PENDING' };
     this.challenges.set(challenge.id, challenge);
     return challenge;
   }
@@ -212,5 +224,21 @@ export class QrChallengeStore {
 
   delete(id: string): void {
     this.challenges.delete(id);
+  }
+
+  authorize(id: string, sessionToken: string, user: UserProfile, gracePeriodMs = 60_000): AuthorizedQrChallenge | null {
+    const challenge = this.challenges.get(id);
+    if (!challenge) return null;
+    if (challenge.status === 'AUTHORIZED') return challenge;
+    const authorized: AuthorizedQrChallenge = {
+      id: challenge.id,
+      upstreamKey: challenge.upstreamKey,
+      expiresAt: new Date(Date.now() + gracePeriodMs).toISOString(),
+      status: 'AUTHORIZED',
+      sessionToken,
+      user,
+    };
+    this.challenges.set(id, authorized);
+    return authorized;
   }
 }

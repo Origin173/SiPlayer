@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import type {
   AudioQuality,
   CatalogSearchPage,
@@ -92,5 +92,41 @@ describe('auth routes', () => {
     const response = await app.inject({ method: 'GET', url: '/v1/me/playlists' });
     expect(response.statusCode).toBe(401);
     expect(response.json<{ error: { code: string } }>().error.code).toBe('AUTH_REQUIRED');
+  });
+
+  it('replays one authorized session for concurrent duplicate QR polls', async () => {
+    let releaseCheck!: () => void;
+    let checkStarted!: () => void;
+    const checkStartedPromise = new Promise<void>((resolve) => { checkStarted = resolve; });
+    const checkQr = vi.fn(async () => {
+      checkStarted();
+      await new Promise<void>((resolve) => { releaseCheck = resolve; });
+      return { status: 'AUTHORIZED' as const, cookie: 'MUSIC_U=upstream-secret' };
+    });
+    const getCurrentUser = vi.fn(async () => user);
+    const duplicateApp = buildApp(loadConfig({ NODE_ENV: 'test' }), {
+      logger: false,
+      provider,
+      authProvider: { ...authProvider, checkQr, getCurrentUser },
+    });
+
+    const start = await duplicateApp.inject({ method: 'POST', url: '/v1/auth/qr/start', payload: {} });
+    const challengeId = start.json<{ data: { challengeId: string } }>().data.challengeId;
+    const firstPoll = duplicateApp.inject({ method: 'GET', url: `/v1/auth/qr/${challengeId}` });
+    await checkStartedPromise;
+    const secondPoll = duplicateApp.inject({ method: 'GET', url: `/v1/auth/qr/${challengeId}` });
+    releaseCheck();
+    const [first, second] = await Promise.all([firstPoll, secondPoll]);
+    const retry = await duplicateApp.inject({ method: 'GET', url: `/v1/auth/qr/${challengeId}` });
+    await duplicateApp.close();
+
+    const firstBody = first.json<{ data: { status: string; sessionToken: string } }>();
+    const secondBody = second.json<{ data: { status: string; sessionToken: string } }>();
+    const retryBody = retry.json<{ data: { status: string; sessionToken: string } }>();
+    expect(firstBody.data.status).toBe('AUTHORIZED');
+    expect(secondBody.data).toEqual(firstBody.data);
+    expect(retryBody.data).toEqual(firstBody.data);
+    expect(checkQr).toHaveBeenCalledTimes(1);
+    expect(getCurrentUser).toHaveBeenCalledTimes(1);
   });
 });
