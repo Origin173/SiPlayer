@@ -71,6 +71,18 @@ const secondItem: QueueItem = {
   title: 'Evening Tide',
 };
 
+const thirdItem: QueueItem = {
+  ...item,
+  trackId: 'track-3',
+  title: 'Night Drive',
+};
+
+const fourthItem: QueueItem = {
+  ...item,
+  trackId: 'track-4',
+  title: 'First Light',
+};
+
 const stream = (trackId: string): StreamInfo => ({
   trackId,
   url: `https://audio.example.com/${trackId}.mp3`,
@@ -180,6 +192,26 @@ describe('PlayerProvider', () => {
     expect(usePlayerStore.getState().currentIndex).toBe(1);
     expectStreamResolve(secondItem.trackId, 'auto');
     expect(mocks.audioPlayer.play).toHaveBeenCalledTimes(1);
+    unmount(renderer);
+  });
+
+  it('keeps shuffle playback unique within a round and previous follows playback history', async () => {
+    mocks.resolveStream.mockImplementation(async (trackId) => stream(trackId));
+    const { renderer, controller } = await mountProvider();
+    const queue = [item, secondItem, thirdItem, fourthItem];
+
+    await act(async () => controller.setQueue(queue, 0));
+    act(() => controller.setMode('shuffle'));
+    const playedIndexes = [usePlayerStore.getState().currentIndex];
+    for (let index = 0; index < queue.length - 1; index += 1) {
+      await act(async () => controller.next());
+      playedIndexes.push(usePlayerStore.getState().currentIndex);
+    }
+
+    expect(new Set(playedIndexes).size).toBe(queue.length);
+    const expectedPrevious = playedIndexes.at(-2);
+    await act(async () => controller.previous());
+    expect(usePlayerStore.getState().currentIndex).toBe(expectedPrevious);
     unmount(renderer);
   });
 

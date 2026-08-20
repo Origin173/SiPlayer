@@ -6,7 +6,7 @@ import { loadAppSettings, updateAppSettings } from '../storage/appSettings';
 import { resolveStream } from './playbackResolver';
 import { clampPositionMs, isNewAudioError, isNewAudioFinish, resolveAndPlayTrack, shouldHandleAudioStatus } from './playbackRuntime';
 import { canApplyHydratedSetting, markSettingsHydrated, markUserSettingOverride, type SettingsHydrationGuard } from './settingsHydration';
-import { nextQueueIndex } from './playbackModes';
+import { createShuffleState, nextQueueIndex, nextShuffleIndex, previousShuffleIndex } from './playbackModes';
 import type { PlayContext, PlaybackMode, QueueItem } from './playbackTypes';
 import { usePlayerStore } from './playerStore';
 
@@ -43,6 +43,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const setPlaybackQuality = usePlayerStore((state) => state.setQuality);
   const setPosition = usePlayerStore((state) => state.setPosition);
   const setCurrentIndex = usePlayerStore((state) => state.setCurrentIndex);
+  const setShuffleState = usePlayerStore((state) => state.setShuffleState);
   const clear = usePlayerStore((state) => state.clear);
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
@@ -141,8 +142,14 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   );
 
   const playQueueIndex = useCallback((index: number) => {
+    const state = usePlayerStore.getState();
+    setShuffleState(state.playbackMode === 'shuffle' ? createShuffleState(state.queue.length, index) : {
+      order: [],
+      cursor: -1,
+      history: index >= 0 ? [index] : [],
+    });
     goToIndex(index);
-  }, [goToIndex]);
+  }, [goToIndex, setShuffleState]);
 
   const play = useCallback(() => {
     const state = usePlayerStore.getState();
@@ -202,14 +209,21 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const next = useCallback(() => {
     const state = usePlayerStore.getState();
     if (state.queue.length === 0) return;
-    const nextIndex = nextQueueIndex(state.playbackMode, state.currentIndex, state.queue.length);
+    let nextIndex: number | null;
+    if (state.playbackMode === 'shuffle') {
+      const nextShuffle = nextShuffleIndex({ order: state.shuffleOrder, cursor: state.shuffleCursor, history: state.playHistory }, state.currentIndex, state.queue.length);
+      nextIndex = nextShuffle.index;
+      if (nextIndex != null) setShuffleState(nextShuffle.state);
+    } else {
+      nextIndex = nextQueueIndex(state.playbackMode, state.currentIndex, state.queue.length);
+    }
     if (nextIndex == null) {
       audioPlayer.pause();
       setPlaybackState('ended');
       return;
     }
     goToIndex(nextIndex);
-  }, [audioPlayer, goToIndex, setPlaybackState]);
+  }, [audioPlayer, goToIndex, setPlaybackState, setShuffleState]);
   nextRef.current = next;
 
   const previous = useCallback(() => {
@@ -220,8 +234,14 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       setPosition(0);
       return;
     }
+    if (state.playbackMode === 'shuffle') {
+      const previousShuffle = previousShuffleIndex({ order: state.shuffleOrder, cursor: state.shuffleCursor, history: state.playHistory }, state.currentIndex);
+      setShuffleState(previousShuffle.state);
+      goToIndex(previousShuffle.index);
+      return;
+    }
     goToIndex(Math.max(state.currentIndex - 1, 0));
-  }, [audioPlayer, goToIndex, setPosition]);
+  }, [audioPlayer, goToIndex, setPosition, setShuffleState]);
 
   const addNext = useCallback(
     (item: QueueItem) => {
