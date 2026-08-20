@@ -56,6 +56,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@shopify/flash-list', () => ({ FlashList: mocks.flashList }));
 vi.mock('expo-router', () => ({ useRouter: () => mocks.router }));
+vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 }) }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   StyleSheet: { create: (styles: unknown) => styles },
