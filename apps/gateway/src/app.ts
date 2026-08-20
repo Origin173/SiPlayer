@@ -39,9 +39,13 @@ const cacheablePathPatterns = [
 
 function responseCacheKey(request: FastifyRequest): string | undefined {
   if (request.method !== 'GET') return undefined;
-  const path = request.url.split('?')[0] ?? request.url;
+  const url = new URL(request.url, 'http://gateway.local');
+  const path = url.pathname;
   if (!cacheablePathPatterns.some((pattern) => pattern.test(path))) return undefined;
-  return `${request.method}:${request.url}`;
+  const query = [...url.searchParams.entries()]
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue));
+  const canonicalQuery = new URLSearchParams(query).toString();
+  return `${request.method}:${path}${canonicalQuery ? `?${canonicalQuery}` : ''}`;
 }
 
 function extractCachedData(payload: string): string | undefined {

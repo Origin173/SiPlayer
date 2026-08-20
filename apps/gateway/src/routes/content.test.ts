@@ -81,15 +81,22 @@ describe('content routes', () => {
     const secondSearch = await cacheApp.inject({ method: 'GET', url: '/v1/search?q=cache-test' });
     const firstStream = await cacheApp.inject({ method: 'GET', url: '/v1/tracks/stream-test/stream?quality=high' });
     const secondStream = await cacheApp.inject({ method: 'GET', url: '/v1/tracks/stream-test/stream?quality=high' });
-    await cacheApp.close();
 
     expect(firstSearch.statusCode).toBe(200);
     expect(secondSearch.statusCode).toBe(200);
-    expect(searchTracks).toHaveBeenCalledTimes(1);
     expect(firstSearch.json<{ requestId: string }>().requestId).not.toBe(secondSearch.json<{ requestId: string }>().requestId);
+    expect(searchTracks).toHaveBeenCalledTimes(1);
+
+    const canonicalSearch = await cacheApp.inject({ method: 'GET', url: '/v1/search?q=canonical&type=track' });
+    const reorderedCanonicalSearch = await cacheApp.inject({ method: 'GET', url: '/v1/search?type=track&q=canonical' });
+    expect(canonicalSearch.statusCode).toBe(200);
+    expect(reorderedCanonicalSearch.statusCode).toBe(200);
+    expect(searchTracks).toHaveBeenCalledTimes(2);
+    expect(canonicalSearch.json<{ requestId: string }>().requestId).not.toBe(reorderedCanonicalSearch.json<{ requestId: string }>().requestId);
     expect(firstStream.statusCode).toBe(200);
     expect(secondStream.statusCode).toBe(200);
     expect(resolveStream).toHaveBeenCalledTimes(2);
+    await cacheApp.close();
   });
 
   it('does not accept arbitrary upstream parameters', async () => {
