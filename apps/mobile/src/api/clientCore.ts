@@ -86,17 +86,18 @@ export class ApiClient {
     hasSessionToken: boolean,
     schema?: z.ZodType<T>,
   ): Promise<{ data: T; requestId: string }> {
+    const externalSignal = options.signal;
+    if (externalSignal?.aborted) throw new DOMException('The request was aborted.', 'AbortError');
+
     const controller = new AbortController();
     let timedOut = false;
     const timeout = setTimeout(() => {
       timedOut = true;
       controller.abort();
     }, this.timeoutMs);
-    const externalSignal = options.signal;
     const abortFromExternalSignal = () => controller.abort();
 
     if (externalSignal) {
-      if (externalSignal.aborted) throw new DOMException('The request was aborted.', 'AbortError');
       externalSignal.addEventListener('abort', abortFromExternalSignal, { once: true });
     }
 

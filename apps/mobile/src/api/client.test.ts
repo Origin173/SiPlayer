@@ -71,6 +71,19 @@ describe('ApiClient', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('does not leave a timeout behind when the caller signal is already aborted', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    controller.abort();
+    const fetchImpl = vi.fn<typeof fetch>();
+    const client = new ApiClient({ baseUrl: 'http://gateway.test', fetchImpl });
+
+    await expect(client.request('/v1/search', { signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' });
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('notifies the auth boundary when a session-bearing request expires', async () => {
     const onExpired = vi.fn();
     const removeListener = setSessionExpiredListener(onExpired);
