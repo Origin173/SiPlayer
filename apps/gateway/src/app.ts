@@ -162,6 +162,7 @@ export function buildApp(
   app.addHook('onClose', async () => clearInterval(rateBucketCleanup));
 
   app.addHook('onRequest', async (request, reply) => {
+    if (request.method === 'OPTIONS') return;
     const path = request.url.split('?')[0];
     if (path === '/health' || path === '/v1/health' || path === '/ready' || path === '/v1/ready') return;
     const now = Date.now();

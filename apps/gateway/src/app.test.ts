@@ -89,6 +89,20 @@ describe('gateway foundation routes', () => {
     expect(second.json<{ error: { code: string } }>().error.code).toBe('RATE_LIMITED');
   });
 
+  it('does not count CORS preflight requests toward the rate limit', async () => {
+    const limited = buildApp(loadConfig({ NODE_ENV: 'test', RATE_LIMIT_MAX_REQUESTS: '1' }), { logger: false });
+    const firstPreflight = await limited.inject({ method: 'OPTIONS', url: '/v1/search' });
+    const secondPreflight = await limited.inject({ method: 'OPTIONS', url: '/v1/search' });
+    const firstRequest = await limited.inject({ method: 'GET', url: '/v1/does-not-exist' });
+    const secondRequest = await limited.inject({ method: 'GET', url: '/v1/does-not-exist' });
+    await limited.close();
+
+    expect(firstPreflight.statusCode).toBe(204);
+    expect(secondPreflight.statusCode).toBe(204);
+    expect(firstRequest.statusCode).toBe(404);
+    expect(secondRequest.statusCode).toBe(429);
+  });
+
   it('records request duration, error codes, and rate-limit counts', async () => {
     const metrics = new GatewayMetrics();
     const limited = buildApp(loadConfig({ NODE_ENV: 'test', RATE_LIMIT_MAX_REQUESTS: '1' }), { logger: false, metrics });
