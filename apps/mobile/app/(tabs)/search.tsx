@@ -9,12 +9,15 @@ import { Button, ErrorState, Screen, SearchField, Skeleton } from '@/components/
 import { loadSearchHistory, recordSearchKeyword } from '@/features/searchHistory';
 import { createSearchPlaySelection } from '@/features/searchPlayback';
 import { dedupeByTrackId } from '@/features/searchResults';
+import { getOverlayAwareListPadding } from '@/layout/overlayMetrics';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { usePlayer } from '@/player';
 import { useTheme } from '@/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SearchScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const player = usePlayer();
   const [keyword, setKeyword] = useState('');
@@ -37,6 +40,7 @@ export default function SearchScreen() {
     player.playTrack(selection.item, { queue: selection.queue, startIndex: selection.startIndex });
   };
   const isDebouncing = submittedKeyword !== debouncedSubmittedKeyword;
+  const listPaddingBottom = getOverlayAwareListPadding(insets.bottom);
 
   useEffect(() => {
     void loadSearchHistory().then(setHistory);
@@ -91,7 +95,7 @@ export default function SearchScreen() {
     return (
       <Screen contentContainerStyle={styles.listScreen} scroll={false}>
         <FlashList
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: listPaddingBottom }]}
           data={catalogItems}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={<Text style={[styles.historyText, { color: theme.colors.textSecondary }]}>没有找到匹配的结果</Text>}
@@ -115,7 +119,7 @@ export default function SearchScreen() {
   return (
     <Screen contentContainerStyle={styles.listScreen} scroll={false}>
       <FlashList
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: listPaddingBottom }]}
         data={results}
         keyExtractor={(track) => track.id}
         ListEmptyComponent={<Text style={[styles.historyText, { color: theme.colors.textSecondary }]}>没有找到匹配的歌曲</Text>}

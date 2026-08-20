@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MiniPlayer } from '@/components/music';
+import { MINI_PLAYER_GAP, TAB_BAR_HEIGHT } from '@/layout/overlayMetrics';
 import { useTheme } from '@/theme';
 
 export default function TabsLayout() {
@@ -21,7 +22,7 @@ export default function TabsLayout() {
             backgroundColor: theme.colors.surface,
             borderTopColor: theme.colors.divider,
             borderTopWidth: 1,
-            height: 62 + insets.bottom,
+            height: TAB_BAR_HEIGHT + insets.bottom,
             paddingBottom: insets.bottom,
             paddingTop: 6,
           },
@@ -49,7 +50,7 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
-      <View pointerEvents="box-none" style={[styles.miniPlayer, { bottom: 70 + insets.bottom }]}>
+      <View pointerEvents="box-none" style={[styles.miniPlayer, { bottom: TAB_BAR_HEIGHT + MINI_PLAYER_GAP + insets.bottom }]}>
         <MiniPlayer />
       </View>
     </View>

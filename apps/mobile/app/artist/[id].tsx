@@ -7,7 +7,9 @@ import { Artwork, CatalogRow, SongRow } from '@/components/music';
 import { Button, EmptyState, ErrorState, IconButton, Screen, Skeleton } from '@/components/ui';
 import { queueItemFromTrack } from '@/player/playbackTypes';
 import { usePlayer } from '@/player';
+import { getOverlayAwareListPadding } from '@/layout/overlayMetrics';
 import { useTheme } from '@/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type ArtistListItem =
   | { id: string; kind: 'album'; album: AlbumSummary }
@@ -16,6 +18,7 @@ type ArtistListItem =
 
 export default function ArtistDetailScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const player = usePlayer();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -67,7 +70,7 @@ export default function ArtistDetailScreen() {
   return (
     <Screen contentContainerStyle={styles.screenContent} scroll={false}>
       <FlashList
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: getOverlayAwareListPadding(insets.bottom) }]}
         data={listItems}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={<EmptyState message="这个歌手暂时没有专辑或热门歌曲。" title="暂无内容" />}

@@ -6,10 +6,13 @@ import { Artwork, SongRow } from '@/components/music';
 import { Button, EmptyState, ErrorState, IconButton, Screen, Skeleton } from '@/components/ui';
 import { queueItemFromTrack } from '@/player/playbackTypes';
 import { usePlayer } from '@/player';
+import { getOverlayAwareListPadding } from '@/layout/overlayMetrics';
 import { useTheme } from '@/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function AlbumDetailScreen() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const player = usePlayer();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -47,7 +50,7 @@ export default function AlbumDetailScreen() {
   return (
     <Screen contentContainerStyle={styles.screenContent} scroll={false}>
       <FlashList
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: getOverlayAwareListPadding(insets.bottom) }]}
         data={album.tracks}
         keyExtractor={(track, index) => `${track.id}-${index}`}
         ListEmptyComponent={<EmptyState message="这个专辑暂时没有歌曲。" title="暂无歌曲" />}

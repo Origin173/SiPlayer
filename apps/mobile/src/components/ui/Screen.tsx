@@ -1,6 +1,7 @@
 import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { PropsWithChildren } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getOverlayAwareListPadding } from '@/layout/overlayMetrics';
 import { useTheme } from '@/theme';
 
 interface ScreenProps extends PropsWithChildren {
@@ -16,7 +17,7 @@ export function Screen({ children, scroll = true, contentContainerStyle }: Scree
     {
       backgroundColor: theme.colors.background,
       paddingTop: insets.top + theme.spacing[4],
-      paddingBottom: insets.bottom + theme.spacing[12],
+      paddingBottom: Math.max(insets.bottom + theme.spacing[12], getOverlayAwareListPadding(insets.bottom)),
     },
     contentContainerStyle,
   ];
