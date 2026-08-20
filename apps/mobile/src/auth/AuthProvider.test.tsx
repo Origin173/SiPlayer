@@ -182,6 +182,26 @@ describe('AuthProvider', () => {
     unmount(renderer);
   });
 
+  it('clears the UI session even when local token deletion fails', async () => {
+    let expireSession!: () => Promise<void>;
+    mocks.setSessionExpiredListener.mockImplementation((listener: () => Promise<void>) => {
+      expireSession = listener;
+      return vi.fn();
+    });
+    mocks.getSessionToken.mockResolvedValue('project-session');
+    mocks.apiClient.request.mockResolvedValue({ data: user, requestId: 'request-me' });
+    const { renderer } = await mountProvider();
+    mocks.clearSessionToken.mockRejectedValue(new Error('storage unavailable'));
+
+    await act(async () => {
+      await expect(expireSession()).rejects.toThrow('storage unavailable');
+    });
+
+    expect(mocks.queryClient.removeQueries).toHaveBeenCalledWith({ queryKey: ['me'] });
+    expect(capturedController).toMatchObject({ isAuthenticated: false, user: null });
+    unmount(renderer);
+  });
+
   it('does not update state after hydration resolves after unmount', async () => {
     mocks.getSessionToken.mockResolvedValue('project-session');
     let resolveMe!: (value: { data: UserProfile; requestId: string }) => void;

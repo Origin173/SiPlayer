@@ -32,9 +32,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [isHydrating, setIsHydrating] = useState(true);
 
   const expireSession = useCallback(async () => {
-    await clearSessionToken();
-    queryClient.removeQueries({ queryKey: ['me'] });
-    if (mountedRef.current) setUser(null);
+    try {
+      await clearSessionToken();
+    } finally {
+      queryClient.removeQueries({ queryKey: ['me'] });
+      if (mountedRef.current) setUser(null);
+    }
   }, [queryClient]);
 
   useEffect(() => setSessionExpiredListener(expireSession), [expireSession]);
