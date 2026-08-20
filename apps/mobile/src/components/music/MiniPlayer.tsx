@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ReactNode } from 'react';
 import { useTheme } from '@/theme';
 import { usePlayer, usePlayerStore } from '@/player';
+import { getPlaybackProgress } from '@/player/playbackProgress';
 import { MINI_PLAYER_HEIGHT } from '@/layout/overlayMetrics';
 import { Artwork } from './Artwork';
 import { IconButton } from '../ui';
@@ -14,12 +15,15 @@ export function MiniPlayer() {
   const queue = usePlayerStore((state) => state.queue);
   const currentIndex = usePlayerStore((state) => state.currentIndex);
   const playbackState = usePlayerStore((state) => state.playbackState);
+  const positionMs = usePlayerStore((state) => state.positionMs);
+  const durationMs = usePlayerStore((state) => state.durationMs);
   const current = queue[currentIndex];
 
   if (!current) return null;
 
   const isPlaying = playbackState === 'playing';
   const hasPlaybackError = playbackState === 'error' || playbackState === 'unavailable';
+  const progress = getPlaybackProgress(positionMs, durationMs);
   const statusText = hasPlaybackError ? (playbackState === 'unavailable' ? '当前歌曲暂不可播放' : '播放遇到问题，点击重试') : current.artistText;
 
   return (
@@ -38,7 +42,7 @@ export function MiniPlayer() {
         onPress={hasPlaybackError || !isPlaying ? player.play : player.pause}
       />
       <IconButton accessibilityLabel="打开播放队列" iconSize={22} name="list-outline" onPress={() => router.push({ pathname: '/now-playing', params: { queue: '1' } })} />
-      {isPlaying ? <View style={[styles.progress, { backgroundColor: theme.colors.primary }]} /> : null}
+      {durationMs > 0 && !hasPlaybackError ? <View style={[styles.progress, { backgroundColor: theme.colors.primary, width: `${progress * 100}%` }]} /> : null}
     </View>
   );
 }
@@ -58,5 +62,5 @@ const styles = StyleSheet.create({
   copy: { flex: 1, marginHorizontal: 10, minWidth: 0 },
   title: { fontSize: 14, fontWeight: '600' },
   artist: { fontSize: 12, marginTop: 2 },
-  progress: { bottom: 0, height: 2, left: 0, position: 'absolute', right: 0 },
+  progress: { bottom: 0, height: 2, left: 0, position: 'absolute' },
 });
