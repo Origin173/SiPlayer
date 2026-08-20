@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { Track } from '@siplayer/contracts';
 import type { QueueItem } from './playbackTypes';
 import { usePlayerStore } from './playerStore';
 
@@ -72,5 +73,24 @@ describe('player store', () => {
       positionMs: 450,
       durationMs: 1000,
     });
+  });
+
+  it('updates track metadata for every matching queue item', () => {
+    const track: Track = {
+      id: 'a',
+      name: 'A',
+      artists: [{ id: 'artist-a', name: 'Artist' }],
+      artistText: 'Artist',
+      album: null,
+      artworkUrl: null,
+      durationMs: 1_000,
+      playable: true,
+      liked: false,
+    };
+    usePlayerStore.getState().replaceQueue([{ ...items[0]!, track }], 0);
+
+    usePlayerStore.getState().updateTrackMetadata('a', { liked: true });
+
+    expect(usePlayerStore.getState().queue[0]?.track?.liked).toBe(true);
   });
 });

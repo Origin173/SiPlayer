@@ -160,8 +160,15 @@ export default function NowPlayingScreen() {
                     return;
                   }
                   const nextLiked = !liked;
+                  const previousLiked = liked;
                   setLiked(nextLiked);
-                  likeMutation.mutate({ liked: nextLiked, trackId: current.trackId }, { onError: () => setLiked(liked) });
+                  player.updateTrackMetadata(current.trackId, { liked: nextLiked });
+                  likeMutation.mutate({ liked: nextLiked, trackId: current.trackId }, {
+                    onError: () => {
+                      setLiked(previousLiked);
+                      player.updateTrackMetadata(current.trackId, { liked: previousLiked });
+                    },
+                  });
                 }}
               />
               <IconButton accessibilityLabel="查看歌词" name="text-outline" onPress={() => router.push('/lyrics')} />

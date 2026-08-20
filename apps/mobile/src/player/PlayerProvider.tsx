@@ -28,6 +28,7 @@ export interface PlayerController {
   clearQueue: () => void;
   setMode: (mode: PlaybackMode) => void;
   setQuality: (quality: AudioQuality) => void;
+  updateTrackMetadata: (trackId: string, patch: { liked?: boolean }) => void;
 }
 
 const PlayerContext = createContext<PlayerController | null>(null);
@@ -44,6 +45,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
   const setPosition = usePlayerStore((state) => state.setPosition);
   const setCurrentIndex = usePlayerStore((state) => state.setCurrentIndex);
   const setShuffleState = usePlayerStore((state) => state.setShuffleState);
+  const updateTrackMetadata = usePlayerStore((state) => state.updateTrackMetadata);
   const clear = usePlayerStore((state) => state.clear);
   const mountedRef = useRef(true);
   const generationRef = useRef(0);
@@ -383,8 +385,9 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       clearQueue,
       setMode,
       setQuality,
+      updateTrackMetadata,
     }),
-    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playQueueIndex, playTrack, previous, removeFromQueue, reorderQueue, seekTo, setMode, setPlayerQueue, setQuality, toggle],
+    [addNext, addToQueue, clearNext, clearQueue, next, pause, play, playQueueIndex, playTrack, previous, removeFromQueue, reorderQueue, seekTo, setMode, setPlayerQueue, setQuality, toggle, updateTrackMetadata],
   );
 
   return <PlayerContext.Provider value={controller}>{children}</PlayerContext.Provider>;

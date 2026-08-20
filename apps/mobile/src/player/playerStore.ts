@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AudioQuality } from '@siplayer/contracts';
+import type { AudioQuality, Track } from '@siplayer/contracts';
 import type { QueueItem, PlaybackMode, PlaybackState } from './playbackTypes';
 import { createShuffleState, type ShuffleState } from './playbackModes';
 import { reorderQueue } from './queueOperations';
@@ -24,6 +24,7 @@ interface PlayerStore {
   setPosition: (positionMs: number, durationMs?: number) => void;
   setCurrentIndex: (currentIndex: number) => void;
   setShuffleState: (state: ShuffleState) => void;
+  updateTrackMetadata: (trackId: string, patch: Partial<Pick<Track, 'liked'>>) => void;
   clear: () => void;
 }
 
@@ -131,6 +132,11 @@ export const usePlayerStore = create<PlayerStore>((set) => ({
     shuffleCursor: shuffle.cursor,
     playHistory: shuffle.history,
   }),
+  updateTrackMetadata: (trackId, patch) => set((state) => ({
+    queue: state.queue.map((item) => item.trackId === trackId && item.track
+      ? { ...item, track: { ...item.track, ...patch } }
+      : item),
+  })),
   clear: () =>
     set({
       queue: [],
