@@ -6,6 +6,7 @@ import { useLikedTracks, useRecentTracks, useUserPlaylists } from '@/api/hooks';
 import { PlaylistCard, SongRow } from '@/components/music';
 import { AppCard, Button, EmptyState, ErrorState, Screen, Skeleton } from '@/components/ui';
 import { loadLocalHistory, subscribeLocalHistory } from '@/features/localHistory';
+import { mergeRecentTracks } from '@/features/recentTracks';
 import { queueItemFromTrack } from '@/player/playbackTypes';
 import { usePlayer } from '@/player';
 import { useTheme } from '@/theme';
@@ -22,7 +23,7 @@ export default function LibraryScreen() {
   const likedTracks = useLikedTracks(auth.isAuthenticated && !auth.isHydrating);
   const recentTracks = useMemo(() => {
     const cloudItems = cloudRecent.data?.items ?? [];
-    return cloudItems.length > 0 ? cloudItems : localHistory;
+    return mergeRecentTracks(cloudItems, localHistory);
   }, [cloudRecent.data?.items, localHistory]);
 
   useEffect(() => {

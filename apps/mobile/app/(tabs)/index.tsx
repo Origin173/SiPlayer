@@ -7,6 +7,7 @@ import { useRecentTracks, useUserPlaylists } from '@/api/hooks';
 import { AppCard, Button, EmptyState, ErrorState, IconButton, Screen, Skeleton } from '@/components/ui';
 import { PlaylistCard, SongRow } from '@/components/music';
 import { loadLocalHistory, subscribeLocalHistory } from '@/features/localHistory';
+import { mergeRecentTracks } from '@/features/recentTracks';
 import { queueItemFromTrack } from '@/player/playbackTypes';
 import type { Track } from '@siplayer/contracts';
 import { usePlayer } from '@/player';
@@ -22,7 +23,7 @@ export default function HomeScreen() {
   const playlistsQuery = useUserPlaylists(auth.isAuthenticated && !auth.isHydrating);
   const recentTracks = useMemo(() => {
     const cloudItems = recentQuery.data?.items ?? [];
-    return (cloudItems.length > 0 ? cloudItems : localHistory).filter((track) => track.playable);
+    return mergeRecentTracks(cloudItems, localHistory).filter((track) => track.playable);
   }, [localHistory, recentQuery.data?.items]);
   const playlists = useMemo(() => {
     if (!playlistsQuery.data) return [];
