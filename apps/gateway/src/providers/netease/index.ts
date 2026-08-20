@@ -176,7 +176,7 @@ export class NeteaseProvider implements ContentProvider, AuthProvider {
     const level = {
       auto: 'exhigh',
       standard: 'standard',
-      high: 'higher',
+      high: 'exhigh',
       lossless: 'lossless',
       hi_res: 'hires',
     }[quality];
