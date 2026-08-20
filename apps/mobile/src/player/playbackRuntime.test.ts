@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../api/clientCore';
 import type { StreamInfo } from '@siplayer/contracts';
 import type { QueueItem } from './playbackTypes';
-import { isNewAudioError, isNewAudioFinish, resolveAndPlayTrack, shouldHandleAudioStatus, type PlaybackAudioEngine } from './playbackRuntime';
+import { clampPositionMs, isNewAudioError, isNewAudioFinish, resolveAndPlayTrack, shouldHandleAudioStatus, type PlaybackAudioEngine } from './playbackRuntime';
 
 const item: QueueItem = {
   trackId: 'track-1',
@@ -28,6 +28,13 @@ function createAudio(): PlaybackAudioEngine {
 }
 
 describe('playback runtime', () => {
+  it('clamps seek positions to the known duration', () => {
+    expect(clampPositionMs(-1, 180_000)).toBe(0);
+    expect(clampPositionMs(90_000, 180_000)).toBe(90_000);
+    expect(clampPositionMs(200_000, 180_000)).toBe(180_000);
+    expect(clampPositionMs(200_000, 0)).toBe(200_000);
+  });
+
   it('resolves a stream, updates lock-screen metadata, and starts playback', async () => {
     const audio = createAudio();
     const states: string[] = [];

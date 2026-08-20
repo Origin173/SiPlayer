@@ -33,6 +33,11 @@ export type ResolveAndPlayResult =
   | { status: 'stale' }
   | { status: 'failed'; playbackState: 'error' | 'unavailable' };
 
+export function clampPositionMs(positionMs: number, durationMs: number): number {
+  const nonNegativePosition = Math.max(positionMs, 0);
+  return durationMs > 0 ? Math.min(nonNegativePosition, durationMs) : nonNegativePosition;
+}
+
 export async function resolveAndPlayTrack(options: ResolveAndPlayOptions): Promise<ResolveAndPlayResult> {
   options.setPlaybackState('resolving');
 

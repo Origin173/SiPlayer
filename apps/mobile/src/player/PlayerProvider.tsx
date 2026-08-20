@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, typ
 import { recordLocalTrack } from '../features/localHistory';
 import { loadAppSettings, updateAppSettings } from '../storage/appSettings';
 import { resolveStream } from './playbackResolver';
-import { isNewAudioError, isNewAudioFinish, resolveAndPlayTrack, shouldHandleAudioStatus } from './playbackRuntime';
+import { clampPositionMs, isNewAudioError, isNewAudioFinish, resolveAndPlayTrack, shouldHandleAudioStatus } from './playbackRuntime';
 import { canApplyHydratedSetting, markSettingsHydrated, markUserSettingOverride, type SettingsHydrationGuard } from './settingsHydration';
 import { nextQueueIndex } from './playbackModes';
 import type { PlayContext, PlaybackMode, QueueItem } from './playbackTypes';
@@ -305,7 +305,7 @@ export function PlayerProvider({ children }: PropsWithChildren) {
 
   const seekTo = useCallback(
     (positionMs: number) => {
-      const nextPosition = Math.max(positionMs, 0);
+      const nextPosition = clampPositionMs(positionMs, usePlayerStore.getState().durationMs);
       setPosition(nextPosition);
       void audioPlayer.seekTo(nextPosition / 1000).catch(() => setPlaybackState('error'));
     },
