@@ -1,17 +1,17 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
+    "version": "21.7.1",
     "appVersionSource": "remote"
   },
   "build": {
     "release": {
       "autoIncrement": true,
       "android": {
-        "image": "latest",
+        "image": "ubuntu-26.04-jdk-17-ndk-r27b-sdk-57",
         "buildType": "apk"
       },
       "ios": {
-        "image": "latest"
+        "image": "macos-tahoe-26.5-xcode-26.6"
       }
     }
   }

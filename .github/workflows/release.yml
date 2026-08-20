@@ -127,7 +127,7 @@ jobs:
       - name: Setup EAS CLI
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          eas-version: 21.7.1
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies

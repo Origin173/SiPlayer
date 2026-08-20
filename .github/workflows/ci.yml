@@ -23,4 +23,4 @@ jobs:
       - run: pnpm test
       - run: pnpm --filter @siplayer/gateway build
       - run: pnpm --filter @siplayer/mobile build
-      - run: npx expo-doctor@latest
+      - run: npx expo-doctor@1.20.1
