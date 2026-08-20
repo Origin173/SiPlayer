@@ -33,6 +33,14 @@ describe('gateway config', () => {
     }).ALLOWED_ORIGINS).toBe('https://player.example.com');
   });
 
+  it('requires an explicit session store path in production', () => {
+    expect(() => loadConfig({
+      NODE_ENV: 'production',
+      SESSION_ENCRYPTION_KEY: 'production-secret-that-is-long-enough',
+      ALLOWED_ORIGINS: 'https://player.example.com',
+    })).toThrow(/SESSION_STORE_PATH/);
+  });
+
   it('requires an explicit boolean value for trusted proxy mode', () => {
     expect(loadConfig({ TRUST_PROXY: 'true' }).TRUST_PROXY).toBe(true);
     expect(() => loadConfig({ TRUST_PROXY: 'yes' })).toThrow();

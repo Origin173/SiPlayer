@@ -28,11 +28,12 @@ export function defaultSessionStorePath(platform: NodeJS.Platform = process.plat
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): GatewayConfig {
+  const hasExplicitSessionPath = typeof source.SESSION_STORE_PATH === 'string' && source.SESSION_STORE_PATH.trim().length > 0;
   const config = envSchema.parse(source);
   const sessionStorePath = config.SESSION_STORE_PATH ?? (config.NODE_ENV === 'test' ? undefined : defaultSessionStorePath());
   if (
     config.NODE_ENV === 'production'
-    && (config.SESSION_ENCRYPTION_KEY === 'dev-only-session-encryption-key' || config.ALLOWED_ORIGINS === '*' || !sessionStorePath)
+    && (config.SESSION_ENCRYPTION_KEY === 'dev-only-session-encryption-key' || config.ALLOWED_ORIGINS === '*' || !hasExplicitSessionPath)
   ) {
     throw new Error('Production requires a non-default SESSION_ENCRYPTION_KEY, explicit ALLOWED_ORIGINS, and SESSION_STORE_PATH.');
   }
