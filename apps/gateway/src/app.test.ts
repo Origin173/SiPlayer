@@ -87,6 +87,7 @@ describe('gateway foundation routes', () => {
     expect(first.statusCode).toBe(404);
     expect(second.statusCode).toBe(429);
     expect(second.json<{ error: { code: string } }>().error.code).toBe('RATE_LIMITED');
+    expect(second.headers['retry-after']).toBe('60');
   });
 
   it('does not count CORS preflight requests toward the rate limit', async () => {

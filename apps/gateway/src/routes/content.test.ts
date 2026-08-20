@@ -179,6 +179,7 @@ describe('content routes', () => {
     await limitedApp.close();
 
     expect(response.statusCode).toBe(429);
+    expect(response.headers['retry-after']).toBe('60');
     expect(body.error).toMatchObject({ code: 'RATE_LIMITED', retryable: true });
   });
 

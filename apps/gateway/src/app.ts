@@ -111,6 +111,9 @@ export function buildApp(
   });
 
   app.addHook('onSend', async (_request, reply, payload) => {
+    if (reply.statusCode === 429 && reply.getHeader('retry-after') === undefined) {
+      reply.header('Retry-After', String(Math.max(1, Math.ceil(config.RATE_LIMIT_WINDOW_MS / 1_000))));
+    }
     if (reply.statusCode < 400 || typeof payload !== 'string') return payload;
     try {
       const body = JSON.parse(payload) as { error?: { code?: unknown } };
