@@ -209,6 +209,31 @@ function qualityFromBitrate(bitrate: number | null | undefined, fallback: AudioQ
   return 'standard';
 }
 
+function qualityFromUpstream(level: string | null | undefined, encodeType: string | null | undefined): AudioQuality | null {
+  switch (level?.toLowerCase()) {
+    case 'standard':
+      return 'standard';
+    case 'higher':
+    case 'exhigh':
+      return 'high';
+    case 'lossless':
+      return 'lossless';
+    case 'hires':
+    case 'jymaster':
+    case 'sky':
+      return 'hi_res';
+  }
+
+  switch (encodeType?.toLowerCase()) {
+    case 'flac':
+    case 'wav':
+    case 'ape':
+      return 'lossless';
+    default:
+      return null;
+  }
+}
+
 export function mapStream(
   raw: RawStreamResponse,
   trackId: string,
@@ -222,7 +247,7 @@ export function mapStream(
     trackId,
     url,
     requestedQuality,
-    actualQuality: qualityFromBitrate(item.br, requestedQuality),
+    actualQuality: qualityFromUpstream(item.level, item.encodeType) ?? qualityFromBitrate(item.br, requestedQuality),
     mimeType: item.type
       ? item.type.startsWith('audio/')
         ? item.type

@@ -159,6 +159,8 @@ export const RawStreamItemSchema = z.object({
   br: z.number().nullable().optional(),
   size: z.number().nullable().optional(),
   type: z.string().nullable().optional(),
+  level: z.string().nullable().optional(),
+  encodeType: z.string().nullable().optional(),
   expi: z.number().nullable().optional(),
   code: z.number().nullable().optional(),
 }).passthrough();

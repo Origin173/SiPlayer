@@ -88,6 +88,24 @@ describe('netease mapper', () => {
     });
   });
 
+  it('prefers upstream stream quality over bitrate heuristics', () => {
+    const raw = RawStreamResponseSchema.parse({
+      code: 200,
+      data: [{ id: 123456, url: 'https://audio.example.com/track-123456.flac', br: 320000, type: 'flac', level: 'hires', encodeType: 'flac' }],
+    });
+
+    expect(mapStream(raw, '123456', 'auto')).toMatchObject({ actualQuality: 'hi_res', bitrate: 320000 });
+  });
+
+  it('uses lossless encoding as a conservative fallback when level is absent', () => {
+    const raw = RawStreamResponseSchema.parse({
+      code: 200,
+      data: [{ id: 123456, url: 'https://audio.example.com/track-123456.flac', br: 320000, type: 'flac', encodeType: 'flac' }],
+    });
+
+    expect(mapStream(raw, '123456', 'auto')?.actualQuality).toBe('lossless');
+  });
+
   it('does not confuse download permission with playback permission', () => {
     const song = RawSongSchema.parse({
       id: 123,
