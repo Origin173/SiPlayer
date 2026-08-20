@@ -54,7 +54,7 @@ export async function resolveAndPlayTrack(options: ResolveAndPlayOptions): Promi
     });
     options.onStarted?.();
     options.setPlaybackState('loading');
-    if (options.positionMs && options.audio.seekTo) {
+    if (options.positionMs != null && options.audio.seekTo) {
       await options.audio.seekTo(options.positionMs);
     }
     if (options.autoPlay === false) {

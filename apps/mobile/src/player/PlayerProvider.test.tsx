@@ -392,6 +392,25 @@ describe('PlayerProvider', () => {
     unmount(renderer);
   });
 
+  it('preserves the current position when retrying an audio stream error', async () => {
+    mocks.resolveStream.mockResolvedValue(stream(item.trackId));
+    const { renderer, controller } = await mountProvider();
+
+    await act(async () => controller.playTrack(item));
+    usePlayerStore.setState({ positionMs: 100_000, durationMs: 180_000, playbackState: 'playing' });
+    mocks.audioPlayer.seekTo.mockClear();
+    mocks.audioStatus = { ...mocks.audioStatus, currentTime: 100, duration: 180, playing: true, error: null };
+    await act(async () => renderer.update(providerTree()));
+
+    mocks.audioStatus = { ...mocks.audioStatus, error: new Error('expired stream') };
+    await act(async () => renderer.update(providerTree()));
+
+    expect(mocks.resolveStream).toHaveBeenCalledTimes(2);
+    expect(mocks.audioPlayer.seekTo).toHaveBeenCalledWith(100);
+    expect(mocks.audioPlayer.play).toHaveBeenCalledTimes(2);
+    unmount(renderer);
+  });
+
   it('advances once on a finish edge and ignores a stale repeated status', async () => {
     mocks.resolveStream.mockImplementation(async (trackId) => stream(trackId));
     const { renderer, controller } = await mountProvider();

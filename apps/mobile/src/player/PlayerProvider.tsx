@@ -351,7 +351,10 @@ export function PlayerProvider({ children }: PropsWithChildren) {
       if (!justErrored) return;
       if (streamRetryCountRef.current === 0 && resolvedTrackIdRef.current === current.trackId) {
         streamRetryCountRef.current = 1;
-        void resolveAndPlay(current, true);
+        void resolveAndPlay(current, true, {
+          positionMs: state.positionMs,
+          autoPlay: state.playbackState === 'playing',
+        });
       } else {
         setPlaybackState('error');
       }
