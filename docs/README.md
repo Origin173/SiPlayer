@@ -72,6 +72,8 @@ SQLite（单实例起步）
 Redis（需要多实例/高并发时再引入）
 ```
 
+MVP 的 JSON 文件 session store 仅支持单实例部署；不能让多个 Gateway 进程共享同一个 JSON 文件。需要多实例或高并发时，应迁移到 Redis、SQLite 或其他共享存储。
+
 ### 网易云上游
 
 固定使用：
@@ -229,4 +231,3 @@ Expo Go 可以用于纯 UI/业务逻辑的早期验证，但一旦需要验证�
 - 所有上游字段都在 Gateway Mapper 中消化。
 - 所有错误必须有用户可理解的 UI 状态。
 - 所有核心页面必须考虑 Loading / Empty / Error / Offline / Unauthorized。
-
